@@ -1,0 +1,1 @@
+Drop your own artwork here for the dev build: flag.png (used on boot screen, About dialogs, System Properties, screensaver) and optionally flag-small.png (16px, Start button). The native app reads ~/Library/Application Support/Win98/Branding/ instead.

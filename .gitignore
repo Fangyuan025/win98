@@ -1,0 +1,4 @@
+.DS_Store
+Windows 98.app/
+build/
+*.o

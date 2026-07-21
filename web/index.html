@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Windows 98</title>
+<link rel="stylesheet" href="css/win98.css">
+</head>
+<body>
+  <div id="screen">
+    <div id="desktop">
+      <div id="icons"></div>
+      <div id="marquee" hidden></div>
+    </div>
+    <div id="taskbar">
+      <button id="start-btn" class="tb-btn"><span class="start-flag"></span>Start</button>
+      <div class="tb-sep"></div>
+      <div id="quicklaunch"></div>
+      <div class="tb-sep"></div>
+      <div id="task-buttons"></div>
+      <div id="tray">
+        <div id="tray-icons"></div>
+        <div id="clock" title=""></div>
+      </div>
+    </div>
+    <div id="windows"></div>
+    <div id="overlays"></div>
+  </div>
+  <div id="boot"></div>
+  <script>
+  (function () {
+    // dev (http) appends a cache-buster so edits show immediately; native (file://) loads clean paths
+    var bust = location.protocol === "file:" ? "" : "?v=45";
+    var files = [
+      "js/util.js", "js/store.js", "js/iconart.js", "js/icons.js", "js/sound.js",
+      "js/music.js", "js/fs.js", "js/menu.js", "js/wm.js", "js/dialogs.js", "js/ctxmenu.js", "js/combo.js", "js/fileio.js", "js/alttab.js",
+      "js/printmgr.js",
+      "js/apps/notepad.js", "js/apps/wordpad.js", "js/apps/calc.js",
+      "js/apps/minesweeper.js", "js/apps/solitaire.js", "js/apps/freecell.js",
+      "js/apps/hearts.js", "js/apps/pinball.js", "js/apps/ski.js",
+      "js/apps/wallball.js", "js/apps/worm.js", "js/apps/stackz.js", "js/apps/corridor.js", "js/apps/paint.js", "js/apps/spreadsheet.js",
+      "js/apps/explorer.js", "js/apps/dos.js", "js/apps/ie.js", "js/apps/cpanel.js",
+      "js/apps/media.js", "js/apps/megaamp.js", "js/apps/pal.js", "js/apps/netgrab.js",
+      "js/apps/systools.js", "js/apps/dialup.js",
+      "js/apps/mail.js", "js/apps/sndrec.js", "js/helpdocs.js",
+      "js/apps/encarta.js", "js/apps/addremove.js", "js/apps/access.js",
+      "js/apps/zipmaster.js", "js/apps/chatterbox.js", "js/apps/surreal.js",
+      "js/apps/hyperterm.js", "js/apps/pagecrafter.js",
+      "js/apps/claude98.js", "js/apps/photogoo.js", "js/apps/netmeet.js", "js/apps/organizer.js", "js/apps/composer.js", "js/apps/megademo.js", "js/apps/misc.js",
+      "js/desktop.js", "js/taskbar.js", "js/boot.js", "js/main.js"
+    ];
+    files.forEach(function (f) { document.write('<script src="' + f + bust + '"><\/script>'); });
+  })();
+  </script>
+</body>
+</html>
