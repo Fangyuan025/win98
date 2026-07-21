@@ -166,7 +166,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         // Referer header) — required by YouTube embeds, harmless everywhere else
         localServer = LocalServer(root: webRoot)
         let port = localServer.start()
-        if port > 0, let u = URL(string: "http://127.0.0.1:\(port)/index.html") {
+        // load via the "localhost" NAME, not 127.0.0.1: YouTube accepts a
+        // localhost Referer for copyright-checked videos but rejects the raw IP
+        if port > 0, let u = URL(string: "http://localhost:\(port)/index.html") {
             webView.load(URLRequest(url: u))
         } else {
             webView.loadFileURL(webRoot.appendingPathComponent("index.html"), allowingReadAccessTo: webRoot)
