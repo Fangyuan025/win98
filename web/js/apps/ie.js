@@ -791,6 +791,7 @@ W98.Apps.ie = {
       .live98 .live-body th { background:#c0c0c0; }
       .live98 .live-body .imgwrap { margin:8px 0; }
       .live98 .live-body img { max-width:100%; border:2px solid #808080; image-rendering:auto; }
+      .live98 .live-body img.ilimg { max-height:90px; max-width:160px; vertical-align:middle; border:1px solid #808080; margin:2px 4px 2px 0; }
       .live98 .live-foot { padding:6px 22px 18px; font-size:11px; color:#606060; font-family:Tahoma,sans-serif; }
       .live98 .live-form { margin:10px 0; padding:8px 10px; background:#efefef; border:1px solid #a0a0a0; font-family:Tahoma,sans-serif; font-size:12px; }
       .live98 .live-form .field { font-size:12px; }
@@ -977,6 +978,7 @@ W98.Apps.ie = {
           Sound.play("click");
           if (href.startsWith("app://")) { W98.launch(href.slice(6)); return; }
           if (href.startsWith("act:")) { pageAction(href); return; }
+          if (href.startsWith("mailto:")) { W98.launch("mail"); return; }
           navigate(href);
         });
         a.addEventListener("mouseenter", () => win.setStatus(0, href));

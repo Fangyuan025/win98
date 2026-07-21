@@ -131,6 +131,19 @@ W98.WebFetch = (() => {
       return s;
     }
 
+    /* every anchor stays an anchor: http(s) and mailto both clickable */
+    function renderA(c) {
+      const href = c.getAttribute("href");
+      const abs = href ? absUrl(href, baseUrl) : null;
+      const inner = inline(c).trim();
+      if (!abs || !inner) return inner;
+      if ((/^https?:/.test(abs) || /^mailto:/.test(abs)) && linkCount < 2000) {
+        linkCount++;
+        return `<a href="${ESC(abs)}">${inner}</a>`;
+      }
+      return inner;
+    }
+
     function inline(node) {
       let s = "";
       for (const c of node.childNodes) {
@@ -138,12 +151,13 @@ W98.WebFetch = (() => {
         if (c.nodeType === 3) { const t = ESC(c.nodeValue.replace(/\s+/g, " ")); textBudget -= t.length; s += t; }
         else if (c.nodeType === 1) {
           const tag = KEEP_INLINE[c.tagName];
-          if (c.tagName === "A") {
-            const href = c.getAttribute("href");
-            const abs = href ? absUrl(href, baseUrl) : null;
-            const inner = inline(c).trim();
-            if (abs && inner && /^https?:/.test(abs) && linkCount < 400) { linkCount++; s += `<a href="${ESC(abs)}">${inner}</a>`; }
-            else s += inner;
+          if (c.tagName === "A") s += renderA(c);
+          else if (c.tagName === "IMG") {
+            /* linked images keep their picture (or at least their alt text) so the link survives */
+            const src = c.getAttribute("src") || c.getAttribute("data-src");
+            const abs = src ? absUrl(src, baseUrl) : null;
+            if (abs && /^https?:/.test(abs) && imgCount < 20) { imgCount++; s += `<img class="ilimg" src="${ESC(abs)}" alt="${ESC(c.getAttribute("alt") || "")}" loading="lazy">`; }
+            else if (c.getAttribute("alt")) s += ESC(c.getAttribute("alt"));
           } else if (c.tagName === "BR") s += "<br>";
           else if (tag) s += `<${tag}>${inline(c)}</${tag}>`;
           else s += inline(c);
@@ -202,7 +216,7 @@ W98.WebFetch = (() => {
             out += `<div class="imgwrap"><img src="${ESC(abs)}" alt="${ESC(c.getAttribute("alt") || "")}" loading="lazy"></div>`;
           }
         } else if (tag === "A" && !c.querySelector("p,div,li,h1,h2,h3")) {
-          const t = inline(c).trim();
+          const t = renderA(c);
           if (t) out += `<p>${t}</p>`;
         } else if (tag === "TABLE") {
           out += "<table border=1 cellpadding=4 cellspacing=0>";
