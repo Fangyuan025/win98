@@ -274,6 +274,62 @@ W98.Apps = W98.Apps || {};
     ]) };
   }
 
+  /* ---------- zh-TW: understand Chinese, answer in Chinese ---------- */
+  const ZH_APPS = { "\u5c0f\u756b\u5bb6": "paint", "\u8a18\u4e8b\u672c": "notepad", "\u5c0f\u7b97\u76e4": "calc",
+    "\u8e29\u5730\u96f7": "minesweeper", "\u63a5\u9f8d": "solitaire", "\u5f48\u73e0\u53f0": "pinball",
+    "\u767e\u79d1": "encarta", "\u6a94\u6848\u7e3d\u7ba1": "explorer", "\u700f\u89bd\u5668": "ie",
+    "\u8a08\u7b97\u6a5f": "calc", "\u90f5\u4ef6": "mail", "\u97f3\u6a02": "megaamp" };
+  const RESP_ZH = {};
+  function zrep(en, zhs) { RESP_ZH[en] = zhs; }
+  zrep("Hello! Claude here, reporting for duty from inside your computer. What shall we do?",
+    "\u60a8\u597d\uff01\u6211\u662f Claude\uff0c\u5f9e\u60a8\u7684\u96fb\u8166\u88e1\u5411\u60a8\u5831\u5230\u3002\u6211\u5011\u4f86\u505a\u9ede\u4ec0\u9ebc\uff1f");
+  zrep("Hey! I was just defragmenting my thoughts. What can I help with?",
+    "\u55e8\uff01\u6211\u525b\u525b\u5728\u91cd\u7d44\u6211\u7684\u601d\u7dd2\u3002\u6709\u4ec0\u9ebc\u53ef\u4ee5\u5e6b\u5fd9\uff1f");
+  zrep("Hi there. The desktop is teal, the modem is warm, and I'm ready. What do you need?",
+    "\u60a8\u597d\u3002\u684c\u9762\u662f\u6a19\u6e96\u7da0\u3001\u6578\u64da\u6a5f\u662f\u6eab\u7684\uff0c\u6211\u6e96\u5099\u597d\u4e86\u3002\u9700\u8981\u4ec0\u9ebc\uff1f");
+  const _origRespond = respond;
+  respond = function (text, memory) {
+    const zh = W98.uiLang === "zh-TW";
+    if (zh) {
+      const t = text.trim();
+      /* Chinese intents */
+      let m = t.match(/(?:\u6253\u958b|\u958b\u555f|\u57f7\u884c|\u73a9)\s*(.+?)[\u3002.!\uff01]?$/);
+      if (m) {
+        for (const [zn, appId] of Object.entries(ZH_APPS)) {
+          if (m[1].includes(zn) && W98.Apps[appId]) {
+            return { reply: "\u597d\u7684 \u2014 \u6b63\u5728\u958b\u555f" + zn + "\u3002",
+                     action: () => W98.launch(appId) };
+          }
+        }
+      }
+      if (/\u7b11\u8a71/.test(t)) {
+        memory.lastKind = "joke";
+        return { reply: ["\u70ba\u4ec0\u9ebc\u96fb\u8166\u53bb\u770b\u91ab\u751f\uff1f\n\u56e0\u70ba\u5b83\u4e2d\u6bd2\u4e86\u3002VirusScan 98 \u5df2\u63a5\u7372\u901a\u5831\u3002",
+          "\u4e16\u754c\u4e0a\u53ea\u6709 10 \u7a2e\u4eba\uff1a\u61c2\u4e8c\u9032\u4f4d\u7684\uff0c\u548c\u4e0d\u61c2\u7684\u3002",
+          "\u6211\u672c\u60f3\u8b1b\u500b UDP \u7b11\u8a71\uff0c\u4f46\u60a8\u4e0d\u4e00\u5b9a\u6536\u5f97\u5230\u3002"][(Math.random()*3)|0] };
+      }
+      if (/\u6211\u662f\u8ab0|\u4f60\u662f\u8ab0/.test(t)) {
+        if (/\u6211\u662f\u8ab0/.test(t)) return { reply: "\u60a8\u662f Fangyuan Lin \u2014 \u5de5\u7a0b\u5e2b\u3001\u8499\u7279\u5a41\u3001uOttawa \u96fb\u6a5f\u78a9\u58eb\uff0c\u767c\u8868\u904e\u4e00\u7bc7\u804a\u5929\u6a5f\u5668\u4eba\u96b1\u79c1\u8ad6\u6587\uff0c\u4e5f\u662f Chaty \u7684\u4f5c\u8005 \u2014 \u5b8c\u5168\u5728\u81ea\u5df1\u96fb\u8166\u4e0a\u57f7\u884c\u7684\u804a\u5929 AI\u3002\n\n\u8eab\u70ba\u4f4f\u5728\u672c\u6a5f\u88e1\u7684 AI\uff0c\u6211\u5b8c\u5168\u8a8d\u540c\u9019\u500b\u7406\u5ff5\u3002" };
+        return { reply: "\u6211\u662f Claude \u2014 Anthropic \u6253\u9020\u7684 AI \u52a9\u624b\uff0c\u88ab\u6eab\u67d4\u5730\u79fb\u690d\u56de 1998 \u5e74\uff0c\u6210\u70ba Claude \u684c\u9762\u7248 98\u3002\n\n\u6211\u5b8c\u5168\u5728\u9019\u53f0\u6a5f\u5668\u4e0a\u57f7\u884c\uff08\u5168\u90e8 64 MB\uff09\u3002\u6211\u53ef\u4ee5\u958b\u555f\u7a0b\u5f0f\u3001\u7b97\u6578\u5b78\u3001\u7ba1\u7406\u6a94\u6848\u3001\u641c\u5c0b\u9019\u500b\u5c0f\u5c0f\u7684\u7db2\u969b\u7db2\u8def\u3002" };
+      }
+      if (/\u5e6b\u52a9|\u80fd\u505a\u4ec0\u9ebc|\u529f\u80fd/.test(t)) {
+        return { reply: "\u6211\u5728\u9019\u53f0\u6a5f\u5668\u4e0a\u771f\u7684\u80fd\u505a\u7684\u4e8b\uff1a\n\n  \u2022 \u958b\u555f\u4efb\u4f55\u7a0b\u5f0f \u2014 \u300c\u6253\u958b\u5c0f\u756b\u5bb6\u300d\u3001\u300c\u73a9\u5f48\u73e0\u53f0\u300d\n  \u2022 \u6578\u5b78 \u2014 \u300cwhat is 1998 * 12\u300d\n  \u2022 \u6a94\u6848 \u2014 \u5efa\u7acb\u3001\u8b80\u53d6\u3001\u5217\u51fa\u6211\u7684\u6587\u4ef6\n  \u2022 \u641c\u5c0b\u7db2\u8def\u3001\u64ad\u97f3\u6a02\u3001\u64a5\u865f BBS\u3001\u555f\u52d5\u87a2\u5e55\u4fdd\u8b77\u7a0b\u5f0f\n  \u2022 \u8b1b\u7b11\u8a71\uff08\u300c\u8b1b\u500b\u7b11\u8a71\u300d\uff09\n\n\u82f1\u6587\u6307\u4ee4\u5168\u90e8\u4ecd\u7136\u6709\u6548\u3002" };
+      }
+      if (/\u8b1d\u8b1d/.test(t)) return { reply: "\u4e0d\u5ba2\u6c23\uff01\u6211\u6703\u4e00\u76f4\u5728\u9019\u88e1 \u2014 \u6211\u5b57\u9762\u610f\u7fa9\u4e0a\u96e2\u4e0d\u958b\u3002" };
+      if (/^(\u4f60\u597d|\u55e8|\u54c8\u56c9)/.test(t)) return { reply: RESP_ZH["Hello! Claude here, reporting for duty from inside your computer. What shall we do?"] };
+    }
+    const r = _origRespond(text, memory);
+    if (zh && r && r.reply) {
+      if (RESP_ZH[r.reply]) r.reply = RESP_ZH[r.reply];
+      r.reply = r.reply
+        .replace("Computed locally on your 486. No cloud required \u2014 the cloud hasn't been invented.",
+          "\u5728\u60a8\u7684 486 \u4e0a\u672c\u6a5f\u8a08\u7b97\u3002\u4e0d\u9700\u8981\u96f2\u7aef \u2014 \u96f2\u7aef\u9084\u6c92\u88ab\u767c\u660e\u3002")
+        .replace("(I would have asked for permission, but it's 1998 and the security model is 'hope'.)",
+          "\uff08\u6211\u672c\u4f86\u61c9\u8a72\u5148\u5f9e\u60a8\u7684\u8a31\u53ef\uff0c\u4f46\u9019\u662f 1998 \u5e74\uff0c\u5b89\u5168\u6a21\u578b\u5c31\u662f\u300c\u5e0c\u671b\u4e00\u5207\u9806\u5229\u300d\u3002\uff09");
+    }
+    return r;
+  };
+
   /* ---------- conversations store ---------- */
   function convos() { return Store.get("claudeConvos", []); }
   function saveConvos(c) { Store.set("claudeConvos", c); }

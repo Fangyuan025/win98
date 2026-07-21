@@ -40,6 +40,14 @@ W98.Apps.encarta = {
         "Homework is an ancient practice by which school extends into the home. Traditional formats include the worksheet, the essay, and the diorama, which is a shoebox that consumes an entire weekend.\n\nThe arrival of the home computer transformed homework: reports are now typed, illustrated with clip art, and printed at 11 PM while a parent hovers asking if the printer 'has enough ink.'\n\nThis encyclopedia was purchased to help with homework. Statistically, it is currently being used to read about volcanoes instead.\n\nSee also: Volcanoes, The Book Report, Due Tomorrow." }
     };
 
+    /* zh-TW: swap in translated bodies/titles, keep keys for illustrations */
+    if (W98.uiLang === "zh-TW" && W98.EncartaZh) {
+      for (const k in ART) {
+        const z = W98.EncartaZh[k];
+        if (z) { ART[k].body = z.body; ART[k].title = z.title; ART[k].cat = z.cat; }
+      }
+    }
+    const dispName = (k) => (ART[k] && ART[k].title) || k;
     const win = WM.create({
       title: "Encyclopedia 98", icon: "encarta", appId: "encarta",
       width: 600, height: 440, minWidth: 480, minHeight: 320,
@@ -73,7 +81,7 @@ W98.Apps.encarta = {
         listEl.append(el("div", { style: "font-weight:700;color:#000080;padding:3px 2px 1px", text: cat }));
         cats[cat].sort().forEach(k => {
           const row = el("div", { class: "tree-row", style: "padding-left:12px" });
-          row.append(Icons.img("encarta", 16), el("span", { class: "tlabel", text: k }));
+          row.append(Icons.img("encarta", 16), el("span", { class: "tlabel", text: dispName(k) }));
           if (k === cur) row.classList.add("sel");
           row.addEventListener("mousedown", () => show(k));
           listEl.append(row);
@@ -113,7 +121,7 @@ W98.Apps.encarta = {
       const a = ART[k];
       article.innerHTML = "";
       const head = el("div", { style: "background:linear-gradient(#1a3a7a,#3a5aaa);color:#fff;padding:10px 14px" },
-        el("div", { style: "font-size:20px;font-family:'Times New Roman',serif", text: k }),
+        el("div", { style: "font-size:20px;font-family:'Times New Roman',serif", text: dispName(k) }),
         el("div", { style: "font-size:11px;opacity:0.85", text: a.cat + " · Encyclopedia 98" }));
       const media = el("div", { style: "float:right;width:150px;margin:12px;text-align:center" });
       const cv = el("canvas", { width: "140", height: "100", style: "border:1px solid #888;background:#e8eef8" });
@@ -129,7 +137,7 @@ W98.Apps.encarta = {
       article.append(head, media, text);
       article.scrollTop = 0;
       paintList(search.value);
-      win.setStatus(0, "Reading: " + k);
+      win.setStatus(0, "Reading: " + dispName(k));
     }
     function drawIllustration(c, k) {
       c.fillStyle = "#e8eef8"; c.fillRect(0, 0, 140, 100);

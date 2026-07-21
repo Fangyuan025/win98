@@ -54,6 +54,7 @@ W98.Apps.run = {
       hypertrm: "hyperterm", hyperterminal: "hyperterm", bbs: "hyperterm",
       claude: "claude98", claude98: "claude98", assistant: "claude98",
       calendar: "calendar", cal: "calendar", stickies: "stickies", note: "stickies",
+      intl: "regional", regional: "regional", language: "regional", "intl.cpl": "regional",
       corridor: "corridor", doom: "corridor", fps: "corridor",
       composer: "composer", tracker: "composer",
       megademo: "megademo", demo: "megademo",
@@ -162,7 +163,7 @@ W98.Apps.find = {
 W98.Apps.help = {
   name: "Windows Help", icon: "help", single: true,
   launch(topic) {
-    const TOPICS = W98.HelpTopics;
+    const TOPICS = (W98.uiLang === "zh-TW" && W98.HelpTopicsZh) ? W98.HelpTopicsZh : W98.HelpTopics;
 
     const win = WM.create({
       title: "Windows Help", icon: "help", appId: "help",

@@ -87,6 +87,7 @@ const Taskbar = W98.Taskbar = (() => {
     ];
     const setItems = [
       { label: "Control Panel", icon: "settings", click: () => W98.launch("explorer", "::ControlPanel") },
+      { label: "Regional Settings", icon: "settings", click: () => W98.launch("regional") },
       { label: "Taskbar & Start Menu...", icon: "settings", click: () => taskbarProps() },
       "-",
       { label: "Active Desktop", icon: "display", sub: [

@@ -54,7 +54,7 @@ const Menu = W98.Menu = (() => {
         row.append(pad);
       }
       const lbl = el("span");
-      renderLabel(lbl, it.label);
+      renderLabel(lbl, W98.tr ? W98.tr(it.label) : it.label);
       if (it.bold) lbl.style.fontWeight = "700";
       row.append(lbl);
       row._mi = it;
@@ -182,9 +182,11 @@ const Menu = W98.Menu = (() => {
   function attachBar(barEl, spec) {
     const spans = spec.map((entry, i) => {
       const s = el("span");
-      // menubar labels get the classic first-letter accelerator underline
-      if (entry.label.includes("&")) renderLabel(s, entry.label);
-      else s.append(el("u", { text: entry.label[0] }), entry.label.slice(1));
+      const lbl = W98.tr ? W98.tr(entry.label) : entry.label;
+      // menubar labels get the classic first-letter accelerator underline (Latin only)
+      if (lbl.includes("&")) renderLabel(s, lbl);
+      else if (/^[\x00-\x7f]/.test(lbl)) s.append(el("u", { text: lbl[0] }), lbl.slice(1));
+      else s.textContent = lbl;
       barEl.append(s);
       const open = () => {
         closeFrom(0);

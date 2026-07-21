@@ -41,6 +41,7 @@ W98.Apps.explorer = {
       { name: "Sounds", icon: "sounds", open: () => W98.launch("sounds"), desc: "Change system and program sounds" },
       { name: "System", icon: "system", open: () => W98.launch("sysprops"), desc: "See information about your computer" },
       { name: "Add/Remove Programs", icon: "programs", open: () => W98.launch("addremove"), desc: "Install or remove programs" },
+      { name: "Regional Settings", icon: "settings", open: () => W98.launch("regional"), desc: "Change the language and regional format" },
       { name: "Printers", icon: "printer", open: () => W98.Print.openQueue(), desc: "Add, remove, and set up printers" }
     ];
 

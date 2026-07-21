@@ -171,8 +171,8 @@ kk....kk`, Icons.P, 1),
       win.statusbar = sb;
     }
 
-    win.setStatus = (i, text) => { if (win.sbCells && win.sbCells[i]) win.sbCells[i].textContent = text; };
-    win.setTitle = (t) => { win.title = t; tText.textContent = t; W98.bus.emit("win-title", win); };
+    win.setStatus = (i, text) => { if (win.sbCells && win.sbCells[i]) win.sbCells[i].textContent = W98.tr ? W98.tr(text) : text; };
+    win.setTitle = (t) => { win.title = t; tText.textContent = W98.tr ? W98.tr(t) : t; W98.bus.emit("win-title", win); };
     win.setIcon = (name) => { win.icon = name; tIcon.src = Icons.get(name, 16); W98.bus.emit("win-title", win); };
 
     /* focus */
@@ -414,11 +414,11 @@ kk....kk`, Icons.P, 1),
         im.src = W98.Icons.get ? (Icons.get(iconName, 32)) : im.src;
         bodyRow.append(im);
       }
-      bodyRow.append(el("div", { class: "msgbox-text", text: o.text || "" }));
+      bodyRow.append(el("div", { class: "msgbox-text", text: W98.tr ? W98.tr(o.text || "") : (o.text || "") }));
       const btnRow = el("div", { class: "msgbox-btns" });
       const finish = (label) => { shield.remove(); win.close(true); resolve(label); };
       const btnEls = buttons.map((b, i) => {
-        const btn = el("button", { class: "btn" + (i === (o.defaultBtn || 0) ? " default" : ""), text: b });
+        const btn = el("button", { class: "btn" + (i === (o.defaultBtn || 0) ? " default" : ""), text: W98.tr ? W98.tr(b) : b });
         btn.addEventListener("click", () => finish(b));
         btnRow.append(btn);
         return btn;

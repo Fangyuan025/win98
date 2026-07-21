@@ -797,6 +797,57 @@ W98.Apps.mouse = {
   }
 };
 
+W98.Apps.regional = {
+  name: "Regional Settings", icon: "settings", single: true,
+  launch() {
+    const win = WM.create({
+      title: "Regional Settings Properties", icon: "settings", appId: "regional",
+      width: 380, height: 320, resizable: false, maximizable: false, center: true
+    });
+    win.body.style.padding = "8px";
+    const cur = Store.get("uiLang", "en");
+    let sel = cur;
+    const page = el("div", { style: "padding:4px 6px" });
+    page.append(el("div", { style: "margin-bottom:8px;line-height:1.5",
+      text: W98.tr("Many programs support international settings that you can change. Set your language below.") }));
+    page.append(el("div", { style: "margin-bottom:4px", text: W98.tr("Language:") }));
+    const selEl = el("select", { class: "field", style: "width:100%" });
+    [["en", "English"], ["zh-TW", "\u7e41\u9ad4\u4e2d\u6587 \u2014 Chinese (Traditional)"]].forEach(([v, l]) => {
+      const o = el("option", { value: v, text: l });
+      if (v === cur) o.selected = true;
+      selEl.append(o);
+    });
+    selEl.addEventListener("change", () => { sel = selEl.value; });
+    page.append(selEl);
+    const glyph = el("div", { style: "margin-top:14px;text-align:center;font-size:34px;font-family:serif", text: cur === "zh-TW" ? "\u6587" : "Aa" });
+    selEl.addEventListener("change", () => { glyph.textContent = sel === "zh-TW" ? "\u6587" : "Aa"; });
+    page.append(glyph);
+    page.append(el("div", { style: "margin-top:10px;font-size:11px;color:#606060;line-height:1.5",
+      text: W98.tr("Changing the language affects menus, dialogs, and Help. A restart is required for the change to take full effect.") }));
+
+    const btnRow = el("div", { class: "msgbox-btns", style: "justify-content:flex-end;padding:8px 2px 2px" });
+    const apply = () => {
+      if (sel === cur) { win.close(); return; }
+      W98.setUiLang(sel);
+      win.close();
+      WM.msgbox({
+        title: W98.tr("Regional Settings"), icon: "question",
+        text: (sel === "zh-TW"
+          ? "\u8a9e\u8a00\u5df2\u8b8a\u66f4\u70ba\u7e41\u9ad4\u4e2d\u6587\u3002\n\u9700\u8981\u91cd\u65b0\u555f\u52d5 Windows \u624d\u80fd\u5b8c\u6210\u8b8a\u66f4\u3002\n\n\u73fe\u5728\u8981\u91cd\u65b0\u555f\u52d5\u55ce\uff1f"
+          : "The language has been changed.\nWindows must restart for the change to take full effect.\n\nDo you want to restart now?"),
+        buttons: sel === "zh-TW" ? ["\u662f", "\u5426"] : ["Yes", "No"]
+      }).then(r => {
+        if (r === "Yes" || r === "\u662f") W98.Boot.restart();
+      });
+    };
+    btnRow.append(
+      el("button", { class: "btn default", text: W98.tr("OK"), onclick: apply }),
+      el("button", { class: "btn", text: W98.tr("Cancel"), onclick: () => win.close() }));
+    win.body.append(page, btnRow);
+    return win;
+  }
+};
+
 /* ================= System Properties ================= */
 W98.Apps.sysprops = {
   name: "System", icon: "system", single: true,

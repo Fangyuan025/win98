@@ -10,10 +10,11 @@ function el(tag, attrs, ...kids) {
   if (attrs) for (const k in attrs) {
     if (k === "class") e.className = attrs[k];
     else if (k === "style") e.style.cssText = attrs[k];
-    else if (k === "text") e.textContent = attrs[k];
+    else if (k === "text") e.textContent = W98.tr ? W98.tr(attrs[k]) : attrs[k];
     else if (k === "html") e.innerHTML = attrs[k];
     else if (k.startsWith("on")) e.addEventListener(k.slice(2), attrs[k]);
-    else if (k === "dataset") Object.assign(e.dataset, attrs[k]);
+    else if (k === "dataset") { const d = { ...attrs[k] }; if (d.tip && W98.tr) d.tip = W98.tr(d.tip); Object.assign(e.dataset, d); }
+    else if (k === "placeholder" || k === "title") e.setAttribute(k, W98.tr ? W98.tr(attrs[k]) : attrs[k]);
     else e.setAttribute(k, attrs[k]);
   }
   for (const kid of kids) {
