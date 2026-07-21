@@ -135,6 +135,24 @@ W98.Apps.ie = {
             Terminal aesthetic, bilingual, and a <a href="http://www.fangyuanlin.com/blog/">guest essay from the year 2026</a>.
             The webring committee approves.</span>
           </div>
+          <div style="border:2px solid #006000;background:#eaffea;padding:8px 10px;margin:8px 0">
+            <b style="color:#006000">🌐 THE REAL INTERNET — LIVE FROM THE FUTURE</b><br>
+            <span style="font-size:11px">This browser can also dial the <i>actual</i> World Wide Web of today.
+            Every page arrives dressed for 1998: gray, serif, and full of blue links.</span>
+            <form data-realsearch="1" style="margin:8px 0 4px">
+              <input name="q" style="width:250px;font-size:13px;border:2px inset #ccc;padding:2px" placeholder="Search the real Web...">
+              <button style="font-size:12px">Search</button>
+            </form>
+            <span style="font-size:11px">
+              Or visit:
+              <a href="https://en.wikipedia.org/wiki/Main_Page"><b>Wikipedia</b></a> ·
+              <a href="https://www.google.com/">Google</a> ·
+              <a href="https://www.bing.com/">Bing</a> ·
+              <a href="https://html.duckduckgo.com/html/">DuckDuckGo</a> ·
+              <a href="https://www.nasa.gov/">NASA</a> ·
+              <a href="https://web.archive.org/">Internet Archive</a>
+            </span>
+          </div>
           <p><b>Today's headlines:</b></p>
           <ul>
             <li><a href="http://www.web-times.com/">Windows 98 released to record crowds</a></li>
@@ -904,6 +922,9 @@ W98.Apps.ie = {
           if (f.dataset.search) {
             const q2 = f.elements.q.value.trim();
             navigate("http://www.altavibe.com/?q=" + encodeURIComponent(q2));
+          } else if (f.dataset.realsearch) {
+            const q2 = f.elements.q.value.trim();
+            if (q2) navigate("https://html.duckduckgo.com/html/?q=" + encodeURIComponent(q2));
           } else if (f.dataset.guestbook) {
             const name = f.elements.name.value.trim() || "Anonymous Netizen";
             const msg = f.elements.msg.value.trim();
