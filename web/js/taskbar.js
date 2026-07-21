@@ -73,6 +73,7 @@ const Taskbar = W98.Taskbar = (() => {
       { label: "NetMeet 98", icon: "netmeet", click: () => W98.launch("netmeet") },
       { label: "PhotoGoo", icon: "photogoo", click: () => W98.launch("photogoo") },
       { label: "MegaAmp", icon: "megaamp", click: () => W98.launch("megaamp") },
+      { label: "Media Player 98", icon: "tv98", click: () => W98.launch("mediaplayer") },
       { label: "SurrealPlayer G2", icon: "surreal", click: () => W98.launch("surreal") },
       { label: "MS-DOS Prompt", icon: "dos", click: () => W98.launch("dos") },
       { label: "NetGrab", icon: "netgrab", click: () => W98.launch("netgrab") },

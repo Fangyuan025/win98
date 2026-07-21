@@ -296,5 +296,20 @@ W98.I18N_BODY_ZH = {
   "Or on DuckDuckGo (the text-only door)": "或在 DuckDuckGo（純文字之門）",
   "Try again": "再試一次", "in a minute or two.": "一兩分鐘後。",
   "Return to the start page.": "回到起始頁。",
-  "Verification required": "需要驗證"
+  "Verification required": "需要驗證",
+
+  /* ---- Media Player 98 ---- */
+  "Clip: (none)": "剪輯: (無)", "Clip: ": "剪輯: ",
+  "Open a streaming video with File > Open URL...": "用 檔案 > 開啟 URL... 開啟串流視訊",
+  "YouTube, Bilibili, Vimeo and Dailymotion links all work. The 28.8k modem will do its best.":
+    "YouTube、Bilibili、Vimeo 和 Dailymotion 連結都可以用。28.8k 數據機會盡力的。",
+  "That does not look like a video link.\n\nPaste a YouTube, Bilibili, Vimeo or Dailymotion address.":
+    "這看起來不像視訊連結。\n\n請貼上 YouTube、Bilibili、Vimeo 或 Dailymotion 網址。",
+  "Streaming... (buffering happens inside the little window now)": "串流中...（緩衝現在發生在小視窗裡）",
+  "Open URL": "開啟 URL", "Enter the address of a streaming video:": "輸入串流視訊的網址:",
+  "Streaming video detected": "偵測到串流視訊",
+  "This link is a ": "這個連結是 ", " video. It opened in ": " 視訊，已在 ",
+  " — in 1998, every file type got its own player, and we see no reason to change that.":
+    " 中開啟 — 在 1998 年，每種檔案類型都有自己的播放器，我們認為沒有理由改變這一點。",
+  "Open it in Media Player again": "再次在 Media Player 中開啟"
 };

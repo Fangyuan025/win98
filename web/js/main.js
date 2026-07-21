@@ -185,7 +185,7 @@
     W98.Screensaver && W98.Screensaver.init();
     W98.DisplayMode && W98.DisplayMode.apply();
     /* these programs need the internet; opening them offline triggers the dial-up prompt */
-    ["pal", "chatterbox", "netgrab", "surreal", "netmeet"].forEach((id) => {
+    ["pal", "chatterbox", "netgrab", "surreal", "netmeet", "mediaplayer"].forEach((id) => {
       const app = W98.Apps[id];
       if (!app || app._netWrapped) return;
       app._netWrapped = true;

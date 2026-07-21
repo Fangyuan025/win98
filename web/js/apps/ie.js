@@ -150,7 +150,8 @@ W98.Apps.ie = {
               <a href="https://www.bing.com/">Bing</a> ·
               <a href="https://html.duckduckgo.com/html/">DuckDuckGo</a> ·
               <a href="https://www.nasa.gov/">NASA</a> ·
-              <a href="https://web.archive.org/">Internet Archive</a>
+              <a href="https://web.archive.org/">Internet Archive</a> ·
+              <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ">🎬 Streaming video demo</a>
             </span>
           </div>
           <p><b>Today's headlines:</b></p>
@@ -891,6 +892,36 @@ W98.Apps.ie = {
       const [base0, qs] = url.split("?");
       const base = siteFor(base0) || base0;
       const q = qs ? decodeURIComponent((qs.match(/q=([^&]*)/) || [])[1] || "").replace(/\+/g, " ") : null;
+      /* streaming video links open in Media Player 98, the way 1998 intended */
+      const vid = !SITES[base] && W98.parseVideoUrl && W98.parseVideoUrl(url);
+      if (vid) {
+        W98.launch("mediaplayer", url);
+        pageEl.innerHTML = "";
+        pageEl.append(style);
+        const wp = el("div", { class: "webpage", html: `
+          <div style="padding:30px 40px;font-family:'Times New Roman',serif">
+            <h2 style="font-size:17px">${W98.tr("Streaming video detected")}</h2>
+            <p style="font-size:13px">${W98.tr("This link is a ")}<b>${vid.site}</b>${W98.tr(" video. It opened in ")}<b>Media Player 98</b>${W98.tr(" — in 1998, every file type got its own player, and we see no reason to change that.")}</p>
+            <hr>
+            <ul style="font-size:12px">
+              <li><a href="act:replay:go">${W98.tr("Open it in Media Player again")}</a></li>
+              <li><a href="${HOME}">${W98.tr("Return to the start page.")}</a></li>
+            </ul>
+          </div>` });
+        $$("a", wp).forEach(a => {
+          const href = a.getAttribute("href") || "";
+          a.addEventListener("click", (e) => {
+            e.preventDefault();
+            if (href.startsWith("act:replay")) { W98.launch("mediaplayer", url); return; }
+            navigate(href);
+          });
+        });
+        pageEl.append(wp);
+        win.setTitle(vid.site + " - Internet Explorer");
+        win.setStatus(0, "Done");
+        addrInput.value = url;
+        return;
+      }
       /* not a built-in site → fetch the real web and drag it back to 1998 */
       if (!SITES[base] && /^https?:\/\//.test(url) && W98.WebFetch) {
         renderLive(url);

@@ -226,6 +226,9 @@ W98.HelpTopics = {
         serif with blue underlined links. It is the today-internet as 1998 would have seen it.
         Sites built entirely from JavaScript, or that refuse to be fetched, fail gracefully.
         Built-in 1998 sites always take the built-in route.</li>
+      <li><b>Streaming video</b> — YouTube, Bilibili, Vimeo or Dailymotion links open in
+        <b>Media Player 98</b> (Programs menu), which plays the real video inside proper
+        1998 chrome. Every file type gets its own player. That is the law.</li>
       <li><b>Right-click a page</b> — Back, Forward, Refresh, Select All, View Source (real source,
         opened in Notepad), Properties.</li>
     </ul>`],
