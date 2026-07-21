@@ -60,7 +60,7 @@ final class LocalServer {
     }
 }
 
-final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WKNavigationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WKNavigationDelegate, WKUIDelegate {
     var window: NSWindow!
     var localServer: LocalServer!
     var webView: WKWebView!
@@ -148,6 +148,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
 
         webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = self
+        webView.uiDelegate = self   // needed for <input type=file> to open a panel
         if #available(macOS 13.3, *) { webView.isInspectable = true }
 
         window = NSWindow(
@@ -235,6 +236,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
                 }
             }
         default: break
+        }
+    }
+
+    // <input type=file> in WKWebView does nothing unless the host app provides the panel
+    func webView(_ webView: WKWebView, runOpenPanelWith parameters: WKOpenPanelParameters,
+                 initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping ([URL]?) -> Void) {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = parameters.allowsMultipleSelection
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.begin { resp in
+            completionHandler(resp == .OK ? panel.urls : nil)
         }
     }
 

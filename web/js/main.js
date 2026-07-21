@@ -185,14 +185,12 @@
     W98.Screensaver && W98.Screensaver.init();
     W98.DisplayMode && W98.DisplayMode.apply();
     /* these programs need the internet; opening them offline triggers the dial-up prompt */
-    ["pal", "chatterbox", "netgrab", "surreal", "netmeet", "mediaplayer"].forEach((id) => {
+    ["pal", "chatterbox", "netgrab", "surreal", "netmeet"].forEach((id) => {
       const app = W98.Apps[id];
       if (!app || app._netWrapped) return;
       app._netWrapped = true;
       const orig = app.launch.bind(app);
       app.launch = (a) => {
-        /* local video files need no modem */
-        if (id === "mediaplayer" && a && typeof a === "object" && a.local) return orig(a);
         if (!W98.Net || W98.Net.connected) return orig(a);
         W98.Net.require(() => W98.launch(id, a));
         return null;

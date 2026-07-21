@@ -83,11 +83,21 @@ W98.Apps = W98.Apps || {};
       win.body.style.display = "flex";
       win.body.style.flexDirection = "column";
 
+      if (!document.getElementById("mp98css")) {
+        document.head.append(el("style", { id: "mp98css", text: `
+          .mp-controls { background:#c0c0c0; border-top:1px solid #fff; padding:4px 6px; display:flex; align-items:center; gap:3px; }
+          .mp-btn { min-width:28px; height:22px; padding:0 5px; font-size:11px; line-height:1; }
+          .mp-track { flex:1; height:11px; border:1px solid; border-color:#808080 #fff #fff #808080; background:#9a9a9a; position:relative; cursor:pointer; margin:0 6px; }
+          .mp-fill { position:absolute; left:0; top:0; bottom:0; background:#000080; width:0%; pointer-events:none; }
+          .mp-time { font-size:10px; font-family:Tahoma,sans-serif; min-width:82px; text-align:right; }
+        ` }));
+      }
       const stage = el("div", { style: "flex:1;position:relative;background:#000;min-height:0" });
+      const controlsSlot = el("div");
       const banner = el("div", {
         style: "background:#c0c0c0;border-top:1px solid #fff;padding:3px 8px;font-size:10px;display:flex;justify-content:space-between",
       }, el("span", { text: W98.tr("Clip: (none)") }), el("span", { text: "Windows Media ™" }));
-      win.body.append(stage, banner);
+      win.body.append(stage, controlsSlot, banner);
       const clipLabel = banner.firstChild;
 
       function splash() {
@@ -102,6 +112,8 @@ W98.Apps = W98.Apps || {};
       }
 
       function play(u) {
+        /* streaming needs the modem; local files (playLocal) never do */
+        if (W98.Net && !W98.Net.connected) { W98.Net.require(() => { if (!win.closed) play(u); }); return; }
         const vid = parseVideoUrl(u);
         if (!vid) {
           WM.msgbox({ title: "Media Player 98", icon: "warn",
@@ -109,6 +121,7 @@ W98.Apps = W98.Apps || {};
           return;
         }
         stage.innerHTML = "";
+        controlsSlot.innerHTML = "";
         stage.append(el("iframe", {
           src: vid.embed,
           style: "position:absolute;inset:0;width:100%;height:100%;border:0;background:#000",
@@ -123,15 +136,17 @@ W98.Apps = W98.Apps || {};
       win._play = play;
 
       /* local files from a Finder drag or File > Open File... — the video tag
-         does the work, the chrome pretends it is 1998 */
+         does the decoding, but the transport controls are pure 1998 */
       function playLocal(v) {
         stage.innerHTML = "";
+        controlsSlot.innerHTML = "";
         const vid = el("video", {
-          src: v.url, controls: "", autoplay: "",
+          src: v.url, autoplay: "", playsinline: "",
           style: "position:absolute;inset:0;width:100%;height:100%;background:#000"
         });
         vid.addEventListener("error", () => {
           stage.innerHTML = "";
+          controlsSlot.innerHTML = "";
           stage.append(el("div", {
             style: "position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#c0c0c0;font-size:12px;text-align:center;gap:8px;padding:20px"
           },
@@ -142,6 +157,47 @@ W98.Apps = W98.Apps || {};
           win.setStatus(0, W98.tr("Cannot play this file."));
         });
         stage.append(vid);
+
+        /* ---- Win98 transport bar (no native chrome allowed) ---- */
+        const fmt = (s) => {
+          if (!isFinite(s)) s = 0;
+          const m = Math.floor(s / 60), ss = Math.floor(s % 60);
+          return m + ":" + String(ss).padStart(2, "0");
+        };
+        const bPlay = el("button", { class: "btn mp-btn", text: "⏸", dataset: { tip: "Play/Pause" } });
+        const bStop = el("button", { class: "btn mp-btn", text: "■", dataset: { tip: "Stop" } });
+        const bMute = el("button", { class: "btn mp-btn", text: "🔊", dataset: { tip: "Mute" } });
+        const bFull = el("button", { class: "btn mp-btn", text: "⛶", dataset: { tip: "Full Screen" } });
+        const track = el("div", { class: "mp-track" });
+        const fill = el("div", { class: "mp-fill" });
+        track.append(fill);
+        const time = el("span", { class: "mp-time", text: "0:00 / 0:00" });
+        controlsSlot.append(el("div", { class: "mp-controls" }, bPlay, bStop, track, time, bMute, bFull));
+
+        bPlay.addEventListener("click", () => { if (vid.paused) vid.play(); else vid.pause(); });
+        bStop.addEventListener("click", () => { vid.pause(); vid.currentTime = 0; });
+        bMute.addEventListener("click", () => { vid.muted = !vid.muted; bMute.textContent = vid.muted ? "🔇" : "🔊"; });
+        bFull.addEventListener("click", () => { (vid.requestFullscreen || vid.webkitRequestFullscreen || (() => {})).call(vid); });
+        vid.addEventListener("play", () => { bPlay.textContent = "⏸"; });
+        vid.addEventListener("pause", () => { bPlay.textContent = "▶"; });
+        vid.addEventListener("timeupdate", () => {
+          if (vid.duration) fill.style.width = (vid.currentTime / vid.duration * 100) + "%";
+          time.textContent = fmt(vid.currentTime) + " / " + fmt(vid.duration);
+        });
+        const seek = (e) => {
+          const r = track.getBoundingClientRect();
+          if (vid.duration) vid.currentTime = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * vid.duration;
+        };
+        track.addEventListener("mousedown", (e) => {
+          seek(e);
+          const mv = (e2) => seek(e2);
+          const up = () => { document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up); };
+          document.addEventListener("mousemove", mv);
+          document.addEventListener("mouseup", up);
+        });
+        /* double-click the picture to toggle play, like the old players */
+        vid.addEventListener("dblclick", () => { if (vid.paused) vid.play(); else vid.pause(); });
+
         clipLabel.textContent = W98.tr("Clip: ") + v.name;
         win.setTitle(v.name.slice(0, 40) + " - Media Player 98");
         win.setStatus(0, W98.tr("Playing local file — no modem required."));
