@@ -151,11 +151,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
                             try? bytes.write(to: url)
                         }
                     }
+                case "fetchUrl":
+                    // {cmd:"fetchUrl", url, reqId} → IE's retro web renderer
+                    guard let urlStr = dict["url"] as? String,
+                          let reqId = dict["reqId"] as? String,
+                          let url = URL(string: urlStr) else { break }
+                    fetchWeb(url, reqId: reqId)
                 default: break
                 }
             }
         default: break
         }
+    }
+
+    private lazy var webSession: URLSession = {
+        let cfg = URLSessionConfiguration.ephemeral
+        cfg.timeoutIntervalForRequest = 12
+        cfg.httpAdditionalHeaders = [
+            "User-Agent": "Mozilla/4.0 (compatible; MSIE 5.0; Windows 98)",
+            "Accept": "text/html,application/xhtml+xml,text/plain,*/*",
+        ]
+        return URLSession(configuration: cfg)
+    }()
+
+    private func fetchWeb(_ url: URL, reqId: String) {
+        let task = webSession.dataTask(with: url) { [weak self] data, response, error in
+            var result: [String: Any]
+            if let error = error {
+                result = ["ok": false, "error": error.localizedDescription]
+            } else if let http = response as? HTTPURLResponse {
+                let ct = http.value(forHTTPHeaderField: "Content-Type") ?? "text/html"
+                var text = ""
+                if let d = data { text = String(data: d, encoding: .utf8) ?? String(decoding: d, as: UTF8.self) }
+                result = ["ok": true, "status": http.statusCode, "contentType": ct,
+                          "finalUrl": http.url?.absoluteString ?? url.absoluteString, "body": text]
+            } else {
+                result = ["ok": false, "error": "no response"]
+            }
+            let json = (try? JSONSerialization.data(withJSONObject: result)).flatMap { String(data: $0, encoding: .utf8) } ?? "{\"ok\":false,\"error\":\"encode failed\"}"
+            DispatchQueue.main.async {
+                // hand the JSON string to JS as a single safely-quoted argument
+                let arg = (try? JSONSerialization.data(withJSONObject: [json])).flatMap { String(data: $0, encoding: .utf8) } ?? "[\"\"]"
+                self?.webView.evaluateJavaScript("W98.WebFetch.__reply(\"\(reqId)\", \(arg)[0]);", completionHandler: nil)
+            }
+        }
+        task.resume()
     }
 
     private func buildMenu() {

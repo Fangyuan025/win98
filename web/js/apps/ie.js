@@ -751,7 +751,9 @@ W98.Apps.ie = {
       if (e.key === "Enter") {
         let v = addrInput.value.trim();
         if (!/^https?:\/\//.test(v) && !/^app:/.test(v)) v = "http://" + v;
-        if (!v.endsWith("/") && !v.includes("?") && !/\.[a-z]+$/.test(v.split("/").pop() || "")) v += "/";
+        /* only give host-only URLs their trailing slash; leave real paths untouched
+           so live sites like en.wikipedia.org/wiki/Foo aren't 404'd */
+        if (/^https?:\/\/[^/]+$/.test(v)) v += "/";
         navigate(v);
       }
     });
@@ -768,6 +770,29 @@ W98.Apps.ie = {
       @keyframes duckbounce { from { transform: translateY(0) } to { transform: translateY(-14px) } }
     ` });
     pageEl.append(style);
+
+    /* stylesheet for 98-ified live pages */
+    const liveStyle = el("style", { text: `
+      .live98 { background:#fff; color:#000; font-family:'Times New Roman',Georgia,serif; }
+      .live98 .live-bar { background:#000080; color:#fff; font-family:Tahoma,sans-serif; font-size:11px; padding:3px 8px; }
+      .live98 .live-title { font-size:22px; font-weight:700; padding:10px 20px 2px; border-bottom:2px solid #000080; margin-bottom:8px; }
+      .live98 .live-body { padding:0 22px 8px; font-size:14px; line-height:1.55; max-width:660px; }
+      .live98 .live-body h1 { font-size:22px; margin:14px 0 4px; }
+      .live98 .live-body h2 { font-size:18px; margin:12px 0 4px; }
+      .live98 .live-body h3 { font-size:15px; margin:10px 0 3px; }
+      .live98 .live-body p { margin:0 0 9px; }
+      .live98 .live-body a { color:#0000ee; text-decoration:underline; }
+      .live98 .live-body a:visited { color:#551a8b; }
+      .live98 .live-body ul, .live98 .live-body ol { margin:4px 0 9px 26px; }
+      .live98 .live-body li { margin:2px 0; }
+      .live98 .live-body blockquote { border-left:3px solid #808080; margin:8px 0; padding:2px 12px; color:#333; }
+      .live98 .live-body pre { background:#e8e8e8; border:1px solid #a0a0a0; padding:6px; font-family:'Courier New',monospace; font-size:12px; overflow-x:auto; white-space:pre-wrap; }
+      .live98 .live-body table { border-collapse:collapse; margin:8px 0; }
+      .live98 .live-body th { background:#c0c0c0; }
+      .live98 .live-body .imgwrap { margin:8px 0; }
+      .live98 .live-body img { max-width:100%; border:2px solid #808080; image-rendering:auto; }
+      .live98 .live-foot { padding:6px 22px 18px; font-size:11px; color:#606060; font-family:Tahoma,sans-serif; }
+    ` });
 
     let loadTimer = null, spinTimer = null, spinA = 0, y2kTimer = null;
     function startThrobber() {
@@ -844,6 +869,11 @@ W98.Apps.ie = {
       const [base0, qs] = url.split("?");
       const base = siteFor(base0) || base0;
       const q = qs ? decodeURIComponent((qs.match(/q=([^&]*)/) || [])[1] || "").replace(/\+/g, " ") : null;
+      /* not a built-in site → fetch the real web and drag it back to 1998 */
+      if (!SITES[base] && /^https?:\/\//.test(url) && W98.WebFetch) {
+        renderLive(url);
+        return;
+      }
       const html = SITES[base] ? SITES[base](q) : errorPage(url);
       pageEl.innerHTML = "";
       pageEl.append(style);
@@ -907,6 +937,89 @@ W98.Apps.ie = {
       win.setStatus(0, "Done");
       addrInput.value = url;
       pageEl.scrollTop = 0;
+    }
+
+    function liveError(url, reason) {
+      pageEl.innerHTML = "";
+      pageEl.append(style);
+      const wp = el("div", { class: "webpage", html: `
+        <div style="padding:22px 40px;font-family:'Times New Roman',serif">
+          <h2 style="font-size:17px">The page cannot be displayed</h2>
+          <p style="font-size:13px">Internet Explorer tried to fetch <b>${esc(url)}</b> and drag it back to
+          1998, but something went wrong along the way.</p>
+          <hr>
+          <p style="font-size:12px"><b>Reason:</b> ${esc(reason)}</p>
+          <p style="font-size:12px">Please try the following:</p>
+          <ul style="font-size:12px">
+            <li>Click <a href="${esc(url)}">Refresh</a>, or check the address for typos.</li>
+            <li>Some modern sites refuse to be fetched, or are built entirely from JavaScript
+                that this browser was born too early to run.</li>
+            <li>Return to the <a href="${HOME}">start page</a>, where the internet still makes sense.</li>
+          </ul>
+          <p style="font-size:11px;color:#808080">Cannot find server or DNS Error<br>Internet Explorer</p>
+        </div>` });
+      wireLinks(wp);
+      pageEl.append(wp);
+      win.setTitle(W98.tr("The page cannot be displayed") + " - Internet Explorer");
+      win.setStatus(0, "Done");
+      addrInput.value = url;
+    }
+
+    function wireLinks(wp) {
+      $$("a", wp).forEach(a => {
+        const href = a.getAttribute("href");
+        if (!href) return;
+        a.addEventListener("click", (e) => {
+          e.preventDefault();
+          Sound.play("click");
+          if (href.startsWith("app://")) { W98.launch(href.slice(6)); return; }
+          if (href.startsWith("act:")) { pageAction(href); return; }
+          navigate(href);
+        });
+        a.addEventListener("mouseenter", () => win.setStatus(0, href));
+        a.addEventListener("mouseleave", () => win.setStatus(0, "Done"));
+      });
+    }
+
+    let liveToken = 0;
+    function renderLive(url) {
+      const my = ++liveToken;
+      win.setStatus(0, W98.tr("Contacting ") + url.replace(/^https?:\/\//, "").split("/")[0] + "...");
+      W98.WebFetch.fetchUrl(url).then((res) => {
+        if (win.closed || my !== liveToken) return;   /* superseded by a newer navigation */
+        stopThrobber();
+        if (!res.ok) {
+          const map = { timeout: W98.tr("The connection timed out (the 1998 modem waited as long as it could)."),
+                        "not html": W98.tr("That address is not a Web page — it is some other kind of file.") };
+          liveError(url, map[res.error] || res.error || W98.tr("Cannot find server."));
+          return;
+        }
+        const ct = (res.contentType || "").toLowerCase();
+        if (ct && !ct.includes("html") && !ct.includes("text/plain") && !ct.includes("xml")) {
+          liveError(url, W98.tr("This is a ") + ct.split(";")[0] + W98.tr(" file, not a Web page. IE 98 shows words, not everything."));
+          return;
+        }
+        const finalUrl = res.finalUrl || url;
+        const retro = W98.WebFetch.retro(res.body, finalUrl);
+        pageEl.innerHTML = "";
+        pageEl.append(style, liveStyle);
+        const host = finalUrl.replace(/^https?:\/\//, "").split("/")[0];
+        const wp = el("div", { class: "webpage live98" });
+        wp.innerHTML = `
+          <div class="live-bar">🌐 ${esc(host)} — <i>${W98.tr("rendered by Internet Explorer 98 (Retro Mode)")}</i></div>
+          <div class="live-title">${esc(retro.title).slice(0, 120)}</div>
+          <div class="live-body">${retro.body}</div>
+          <div class="live-foot"><hr>${W98.tr("Original address: ")}${esc(finalUrl)}<br>
+            ${W98.tr("Scripts, styles and animation were left in the future where they belong.")}</div>`;
+        wireLinks(wp);
+        /* broken remote images collapse quietly */
+        $$("img", wp).forEach(im => { im.addEventListener("error", () => { const w2 = im.closest(".imgwrap"); if (w2) w2.remove(); }); });
+        pageEl.append(wp);
+        win.setTitle((retro.title || host).slice(0, 60) + " - Internet Explorer");
+        win.setStatus(0, "Done");
+        addrInput.value = url;
+        pageEl.scrollTop = 0;
+      });
     }
 
     function renderOffline(url) {

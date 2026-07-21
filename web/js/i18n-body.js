@@ -273,5 +273,18 @@ W98.I18N_BODY_ZH = {
   "Connect to:": "連線到:", "Work Offline": "離線工作", "Working Offline": "離線工作中",
   "The page cannot be displayed": "無法顯示網頁",
   "The line is busy.\n\n(HyperTerminal is connected to the BBS. One phone line, one dream at a time.)":
-    "線路忙線中。\n\n（超級終端機正連著 BBS。一條電話線，一次一個夢想。）"
+    "線路忙線中。\n\n（超級終端機正連著 BBS。一條電話線，一次一個夢想。）",
+
+  /* ---- Live web (retro renderer) ---- */
+  "Contacting ": "正在連線 ",
+  "rendered by Internet Explorer 98 (Retro Mode)": "由 Internet Explorer 98 呈現（懷舊模式）",
+  "Original address: ": "原始網址: ",
+  "Scripts, styles and animation were left in the future where they belong.":
+    "指令碼、樣式與動畫都留在了它們該待的未來。",
+  "The connection timed out (the 1998 modem waited as long as it could).":
+    "連線逾時（1998 年的數據機已經盡力等待了）。",
+  "That address is not a Web page — it is some other kind of file.":
+    "這個網址不是網頁 — 它是其他類型的檔案。",
+  "Cannot find server.": "找不到伺服器。",
+  "This is a ": "這是一個 ", " file, not a Web page. IE 98 shows words, not everything.": " 檔案，不是網頁。IE 98 顯示文字，不是所有東西。"
 };

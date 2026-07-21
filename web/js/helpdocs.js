@@ -221,6 +221,11 @@ W98.HelpTopics = {
         your real high scores), <b>Y2K Watch</b> (live countdown), the <b>webring</b>, and more.</li>
       <li><b>Favorites</b> — add pages, find them in the menu and the Start menu.</li>
       <li><b>Go → History</b> — your last 15 pages, remembered between sessions.</li>
+      <li><b>The real web, 98-ified</b> — type any modern address (en.wikipedia.org, example.com,
+        a news site) and IE fetches it, strips the scripts and styling, and re-renders it in gray
+        serif with blue underlined links. It is the today-internet as 1998 would have seen it.
+        Sites built entirely from JavaScript, or that refuse to be fetched, fail gracefully.
+        Built-in 1998 sites always take the built-in route.</li>
       <li><b>Right-click a page</b> — Back, Forward, Refresh, Select All, View Source (real source,
         opened in Notepad), Properties.</li>
     </ul>`],
