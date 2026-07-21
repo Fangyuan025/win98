@@ -30,7 +30,7 @@
   <script>
   (function () {
     // dev (http) appends a cache-buster so edits show immediately; native (file://) loads clean paths
-    var bust = location.protocol === "file:" ? "" : "?v=54";
+    var bust = location.protocol === "file:" ? "" : "?v=55";
     var files = [
       "js/util.js", "js/store.js", "js/i18n-body.js", "js/i18n.js", "js/iconart.js", "js/icons.js", "js/sound.js",
       "js/music.js", "js/fs.js", "js/menu.js", "js/wm.js", "js/dialogs.js", "js/ctxmenu.js", "js/combo.js", "js/fileio.js", "js/alttab.js",
@@ -46,7 +46,8 @@
       "js/apps/encarta.js", "js/apps/addremove.js", "js/apps/access.js",
       "js/apps/zipmaster.js", "js/apps/chatterbox.js", "js/apps/surreal.js",
       "js/apps/hyperterm.js", "js/apps/pagecrafter.js",
-      "js/apps/claude98.js", "js/apps/photogoo.js", "js/apps/netmeet.js", "js/apps/organizer.js", "js/apps/composer.js", "js/apps/megademo.js", "js/apps/misc.js",
+      "js/apps/claude98.js", "js/apps/photogoo.js", "js/apps/netmeet.js", "js/apps/organizer.js", "js/apps/composer.js", "js/apps/megademo.js",
+      "js/apps/deskpet.js", "js/apps/tv98.js", "js/apps/misc.js",
       "js/desktop.js", "js/taskbar.js", "js/boot.js", "js/main.js"
     ];
     files.forEach(function (f) { document.write('<script src="' + f + bust + '"><\/script>'); });

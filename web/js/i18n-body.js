@@ -228,5 +228,21 @@ W98.I18N_BODY_ZH = {
   "Pixel the cat lives in WordPad now. Type 'Dear' and see what happens.":
     "貓咪 Pixel 現在住在 WordPad 裡。輸入「Dear」看看會發生什麼。",
   "Add/Remove Programs actually removes programs. It will also reinstall them, because it misses them.":
-    "新增/移除程式真的會移除程式。它也會重新安裝 — 因為它想念它們。"
+    "新增/移除程式真的會移除程式。它也會重新安裝 — 因為它想念它們。",
+
+  /* ---- DeskPet 98 / TV98 ---- */
+  "Feed": "餵食", "Play": "玩耍", "Sleep": "睡覺", "Wake": "叫醒", "Clean": "清理",
+  "Hunger": "飢餓", "Happy": "快樂", "Energy": "體力",
+  "Rename Pet...": "重新命名寵物...", "Release Pet...": "放生寵物...",
+  "New name:": "新名字:", "An egg! Name your new pet:": "一顆蛋！幫新寵物取個名字:",
+  "Double-click the egg!": "連按兩下這顆蛋！", "An egg is waiting.": "有一顆蛋在等著。",
+  "Shh — it is sleeping.": "噓 — 牠在睡覺。", "Too tired to play. Try Sleep.": "太累了玩不動。試試「睡覺」。",
+  "Release your pet into the wild?\n(The wild is behind the monitor. It will be fine. Probably.)":
+    "要把寵物放生到野外嗎？\n（野外就在螢幕後面。牠會沒事的。大概。）",
+  "Blobling": "小小凍", "Bloblet": "凍凍", "Grand Blob": "大凍王", "age": "年齡", "d": "天",
+  "Channel": "頻道", "Power off. The screen misses you.": "已關機。螢幕想念您。",
+  "LOCAL FORECAST": "地區天氣預報", "CALL NOW: 555-SHOP": "現在就打: 555-SHOP",
+  "Only ": "只剩 ", " left! (number may be theatrical)": " 件！（數字可能有戲劇成分）",
+  "THE DUCK HOUR": "鴨鴨時間",
+  "Forecast accuracy not guaranteed before, during, or after 1998.": "預報準確度在 1998 年前、中、後皆不保證。"
 };

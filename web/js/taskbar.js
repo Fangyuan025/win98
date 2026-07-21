@@ -18,6 +18,8 @@ const Taskbar = W98.Taskbar = (() => {
         { label: "Entertainment", icon: "programs", sub: [
           { label: "Composer 98", icon: "composer", click: () => W98.launch("composer") },
           { label: "MEGADEMO 98", icon: "megademo", click: () => W98.launch("megademo") },
+          { label: "TV98", icon: "tv98", click: () => W98.launch("tv98") },
+          { label: "DeskPet 98", icon: "deskpet", click: () => W98.launch("deskpet") },
           { label: "CD Player", icon: "cdplayer", click: () => W98.launch("cdplayer") },
           { label: "Media Player", icon: "mediaplayer", click: () => W98.launch("media") },
           { label: "Sound Recorder", icon: "sndrec", click: () => W98.launch("sndrec") },

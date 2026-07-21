@@ -58,6 +58,7 @@ W98.Apps.run = {
       corridor: "corridor", doom: "corridor", fps: "corridor",
       composer: "composer", tracker: "composer",
       megademo: "megademo", demo: "megademo",
+      tv: "tv98", tv98: "tv98", deskpet: "deskpet", pet: "deskpet", tamago: "deskpet",
       photogoo: "photogoo", goo: "photogoo", netmeet: "netmeet", netmeeting: "netmeet",
       pagecrafter: "pagecrafter", frontpage: "pagecrafter", homepage: "pagecrafter",
       realplay: "surreal", realplayer: "surreal",

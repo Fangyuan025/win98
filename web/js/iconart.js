@@ -143,6 +143,40 @@
   draws.tree_pc = computerBox;
 
   /* ---------- Network Neighborhood ---------- */
+  draws.deskpet = x => {
+    /* keychain egg-creature */
+    x.fillStyle = "#e05090";
+    x.beginPath(); x.ellipse(16, 15, 12, 13.5, 0, 0, 7); x.fill();
+    x.fillStyle = "#bfe4c8"; x.fillRect(8.5, 8, 15, 13);
+    x.fillStyle = "#68c8e8";
+    x.beginPath(); x.ellipse(16, 15.5, 5.5, 5, 0, 0, 7); x.fill();
+    x.fillStyle = "#103040";
+    x.fillRect(13.4, 13.6, 1.6, 1.6); x.fillRect(17, 13.6, 1.6, 1.6);
+    x.fillRect(14.5, 17.2, 3, 1);
+    x.fillStyle = "#901850";
+    [[10, 26], [16, 27.5], [22, 26]].forEach(([px, py]) => { x.beginPath(); x.arc(px, py, 2.2, 0, 7); x.fill(); });
+    x.strokeStyle = "#901850"; x.lineWidth = 2;
+    x.beginPath(); x.arc(16, 3.5, 2.6, 0, 7); x.stroke();
+  };
+  draws.tv98 = x => {
+    x.fillStyle = "#5a4632"; rr(x, 2, 5, 28, 21, 3); x.fill();
+    x.fillStyle = "#2a2118"; rr(x, 4.5, 7, 19, 17, 2); x.fill();
+    const g = x.createLinearGradient(6, 8, 22, 23);
+    g.addColorStop(0, "#78c8e8"); g.addColorStop(1, "#3a6a90");
+    x.fillStyle = g; x.fillRect(6, 8.5, 16, 14);
+    /* tiny duck on screen */
+    x.fillStyle = "#f0d040";
+    x.beginPath(); x.ellipse(13, 18, 3.4, 2.6, 0, 0, 7); x.fill();
+    x.beginPath(); x.arc(15.6, 15.6, 1.8, 0, 7); x.fill();
+    /* knobs */
+    x.fillStyle = "#8a7458";
+    x.beginPath(); x.arc(26.5, 11, 1.8, 0, 7); x.fill();
+    x.beginPath(); x.arc(26.5, 16, 1.8, 0, 7); x.fill();
+    x.fillStyle = "#c0b098"; x.fillRect(25.3, 20, 2.6, 1.4);
+    /* antenna */
+    x.strokeStyle = "#404040"; x.lineWidth = 1.4;
+    x.beginPath(); x.moveTo(12, 5); x.lineTo(7, 0.5); x.moveTo(14, 5); x.lineTo(20, 0.5); x.stroke();
+  };
   draws.megademo = x => {
     /* plasma blob + scrolltext hint */
     const g = x.createLinearGradient(2, 2, 30, 30);

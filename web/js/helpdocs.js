@@ -311,6 +311,18 @@ W98.HelpTopics = {
     working), <b>Plasma</b>, Starfield, Mystify, Flying Windows, Pipes, Scrolling Marquee.
     Preview instantly or set an idle timer.</p>`],
 
+  tvpet: ["TV98 & DeskPet 98", `
+    <h2>TV98</h2>
+    <p>A television for your desktop (Accessories → Entertainment). Five channels on the
+    remote: snow, NEWS 3 (live anchor + ticker), the WEATHER channel, SHOP-8 (call now),
+    and THE DUCK HOUR. Authentic static between channels. The power button works;
+    the remote can finally never be lost.</p>
+    <h2>DeskPet 98</h2>
+    <p>A keychain creature for your desktop. Double-click the egg, name it, and keep it
+    alive: <b>Feed</b>, <b>Play</b>, <b>Sleep</b> and <b>Clean</b> (it will need cleaning).
+    Stats decay in real time — even while the app is closed — and it grows through three
+    life stages over the days. Neglect is remembered. The crown must be earned.</p>`],
+
   _s5: "WRITING & OFFICE",
 
   notepad: ["Notepad", `
