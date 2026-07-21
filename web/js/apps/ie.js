@@ -792,6 +792,8 @@ W98.Apps.ie = {
       .live98 .live-body .imgwrap { margin:8px 0; }
       .live98 .live-body img { max-width:100%; border:2px solid #808080; image-rendering:auto; }
       .live98 .live-foot { padding:6px 22px 18px; font-size:11px; color:#606060; font-family:Tahoma,sans-serif; }
+      .live98 .live-form { margin:10px 0; padding:8px 10px; background:#efefef; border:1px solid #a0a0a0; font-family:Tahoma,sans-serif; font-size:12px; }
+      .live98 .live-form .field { font-size:12px; }
     ` });
 
     let loadTimer = null, spinTimer = null, spinA = 0, y2kTimer = null;
@@ -809,6 +811,7 @@ W98.Apps.ie = {
     }
     function stop() {
       clearTimeout(loadTimer);
+      liveToken++;   /* abandon any in-flight live fetch */
       stopThrobber();
       win.setStatus(0, "Stopped");
     }
@@ -982,13 +985,13 @@ W98.Apps.ie = {
     }
 
     let liveToken = 0;
-    function renderLive(url) {
+    function renderLive(url, forceRender) {
       const my = ++liveToken;
       win.setStatus(0, W98.tr("Contacting ") + url.replace(/^https?:\/\//, "").split("/")[0] + "...");
-      W98.WebFetch.fetchUrl(url).then((res) => {
+      W98.WebFetch.fetchUrl(url, { render: !!forceRender }).then((res) => {
         if (win.closed || my !== liveToken) return;   /* superseded by a newer navigation */
-        stopThrobber();
         if (!res.ok) {
+          stopThrobber();
           const map = { timeout: W98.tr("The connection timed out (the 1998 modem waited as long as it could)."),
                         "not html": W98.tr("That address is not a Web page — it is some other kind of file.") };
           liveError(url, map[res.error] || res.error || W98.tr("Cannot find server."));
@@ -996,11 +999,45 @@ W98.Apps.ie = {
         }
         const ct = (res.contentType || "").toLowerCase();
         if (ct && !ct.includes("html") && !ct.includes("text/plain") && !ct.includes("xml")) {
+          stopThrobber();
           liveError(url, W98.tr("This is a ") + ct.split(";")[0] + W98.tr(" file, not a Web page. IE 98 shows words, not everything."));
           return;
         }
         const finalUrl = res.finalUrl || url;
         const retro = W98.WebFetch.retro(res.body, finalUrl);
+        /* JS-walled site (Google and friends): retry once with full rendering */
+        if (!forceRender && W98.WebFetch.looksBlocked(res, retro)) {
+          win.setStatus(0, W98.tr("Site requires scripts — rendering it the modern way, then dressing it in 1998..."));
+          renderLive(url, true);
+          return;
+        }
+        /* the site suspects robots — do not argue with it, offer a detour instead */
+        if (/\/sorry\/|google\.com\/sorry/.test(finalUrl) || /unusual traffic|captcha-form|g-recaptcha/i.test(res.body || "")) {
+          stopThrobber();
+          let q = "";
+          try { q = new URL(url).searchParams.get("q") || ""; } catch (e) { /* no query */ }
+          pageEl.innerHTML = "";
+          pageEl.append(style);
+          const wp = el("div", { class: "webpage", html: `
+            <div style="padding:26px 40px;font-family:'Times New Roman',serif">
+              <h2 style="font-size:17px">${W98.tr("This site thinks the computer is a robot")}</h2>
+              <p style="font-size:13px">${W98.tr("The site is asking for a human verification that a 1998 browser cannot pass. This usually clears up on its own after a while.")}</p>
+              <hr>
+              <ul style="font-size:12px">
+                ${q ? `<li><a href="https://www.bing.com/search?q=${encodeURIComponent(q)}"><b>${W98.tr("Search for the same thing on Bing")}</b></a></li>
+                       <li><a href="https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}">${W98.tr("Or on DuckDuckGo (the text-only door)")}</a></li>` : ""}
+                <li><a href="${esc(url)}">${W98.tr("Try again")}</a> ${W98.tr("in a minute or two.")}</li>
+                <li><a href="${HOME}">${W98.tr("Return to the start page.")}</a></li>
+              </ul>
+            </div>` });
+          wireLinks(wp);
+          pageEl.append(wp);
+          win.setTitle(W98.tr("Verification required") + " - Internet Explorer");
+          win.setStatus(0, "Done");
+          addrInput.value = url;
+          return;
+        }
+        stopThrobber();
         pageEl.innerHTML = "";
         pageEl.append(style, liveStyle);
         const host = finalUrl.replace(/^https?:\/\//, "").split("/")[0];
@@ -1012,6 +1049,27 @@ W98.Apps.ie = {
           <div class="live-foot"><hr>${W98.tr("Original address: ")}${esc(finalUrl)}<br>
             ${W98.tr("Scripts, styles and animation were left in the future where they belong.")}</div>`;
         wireLinks(wp);
+        /* live forms: submit like it's 1998 — a GET request and a full page load */
+        $$("form[data-liveform]", wp).forEach(f => {
+          const submit = () => {
+            const action = f.dataset.action;
+            /* POST forms are retried as GET — search boxes almost always accept both,
+               and password fields were already stripped at render time */
+            const params = [];
+            $$("input[name],select[name]", f).forEach(inp => {
+              if ((inp.type === "checkbox" || inp.type === "radio") && !inp.checked) return;
+              params.push(encodeURIComponent(inp.name) + "=" + encodeURIComponent(inp.value));
+            });
+            Sound.play("click");
+            navigate(action + (action.includes("?") ? "&" : "?") + params.join("&"));
+          };
+          f.addEventListener("submit", (e) => { e.preventDefault(); submit(); });
+          $$("button[data-submit]", f).forEach(b => b.addEventListener("click", (e) => { e.preventDefault(); submit(); }));
+          $$("input[type=text]", f).forEach(inp => inp.addEventListener("keydown", (e) => {
+            e.stopPropagation();
+            if (e.key === "Enter") { e.preventDefault(); submit(); }
+          }));
+        });
         /* broken remote images collapse quietly */
         $$("img", wp).forEach(im => { im.addEventListener("error", () => { const w2 = im.closest(".imgwrap"); if (w2) w2.remove(); }); });
         pageEl.append(wp);

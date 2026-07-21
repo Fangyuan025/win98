@@ -286,5 +286,15 @@ W98.I18N_BODY_ZH = {
   "That address is not a Web page — it is some other kind of file.":
     "這個網址不是網頁 — 它是其他類型的檔案。",
   "Cannot find server.": "找不到伺服器。",
-  "This is a ": "這是一個 ", " file, not a Web page. IE 98 shows words, not everything.": " 檔案，不是網頁。IE 98 顯示文字，不是所有東西。"
+  "This is a ": "這是一個 ", " file, not a Web page. IE 98 shows words, not everything.": " 檔案，不是網頁。IE 98 顯示文字，不是所有東西。",
+  "Site requires scripts — rendering it the modern way, then dressing it in 1998...":
+    "網站需要指令碼 — 先以現代方式呈現，再換上 1998 年的衣裝...",
+  "This site thinks the computer is a robot": "這個網站認為這台電腦是機器人",
+  "The site is asking for a human verification that a 1998 browser cannot pass. This usually clears up on its own after a while.":
+    "網站要求 1998 年瀏覽器無法通過的真人驗證。通常過一陣子就會自行解除。",
+  "Search for the same thing on Bing": "在 Bing 搜尋同樣的內容",
+  "Or on DuckDuckGo (the text-only door)": "或在 DuckDuckGo（純文字之門）",
+  "Try again": "再試一次", "in a minute or two.": "一兩分鐘後。",
+  "Return to the start page.": "回到起始頁。",
+  "Verification required": "需要驗證"
 };

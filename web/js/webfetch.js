@@ -17,19 +17,20 @@ W98.WebFetch = (() => {
     p(res);
   }
 
-  function fetchUrl(url) {
+  function fetchUrl(url, opts) {
+    const render = !!(opts && opts.render);   /* render=true → full JS rendering (for JS-walled sites) */
     return new Promise((resolve) => {
-      const timeout = setTimeout(() => resolve({ ok: false, error: "timeout" }), 15000);
+      const timeout = setTimeout(() => resolve({ ok: false, error: "timeout" }), render ? 40000 : 15000);
       const done = (r) => { clearTimeout(timeout); resolve(r); };
 
       if (bridge()) {
         const reqId = "wf" + (++seq);
         pending[reqId] = done;
-        bridge().postMessage({ cmd: "fetchUrl", url, reqId });
+        bridge().postMessage({ cmd: "fetchUrl", url, reqId, render });
         return;
       }
       /* dev/browser: go through the local proxy on the same origin */
-      fetch("/proxy?url=" + encodeURIComponent(url))
+      fetch("/proxy?url=" + encodeURIComponent(url) + (render ? "&render=1" : ""))
         .then(async (r) => {
           const ct = r.headers.get("X-Proxy-Content-Type") || r.headers.get("Content-Type") || "";
           const finalUrl = r.headers.get("X-Proxy-Final-Url") || url;
@@ -48,7 +49,26 @@ W98.WebFetch = (() => {
   const HEADINGS = { H1: 1, H2: 1, H3: 1, H4: 1, H5: 1, H6: 1 };
 
   function absUrl(href, base) {
-    try { return new URL(href, base).href; } catch (e) { return null; }
+    try {
+      let u = new URL(href, base);
+      /* unwrap Google/Bing redirector links so results go straight to the site */
+      if (/\.google\./.test(u.hostname) && u.pathname === "/url") {
+        const real = u.searchParams.get("q") || u.searchParams.get("url");
+        if (real && /^https?:/.test(real)) return real;
+      }
+      return u.href;
+    } catch (e) { return null; }
+  }
+
+  /* does this response look like a "please enable JavaScript" wall? */
+  function looksBlocked(res, retroResult) {
+    const body = res.body || "";
+    if (/if you are not redirected|enable javascript|javascript is (required|disabled)|browser isn't supported|unsupported browser|please turn on javascript/i.test(body.slice(0, 60000))) return true;
+    /* rendered almost nothing readable from a big page → JS-built site */
+    const textLen = retroResult ? retroResult.body.replace(/<[^>]+>/g, "").length : 0;
+    if (body.length > 15000 && textLen < 350) return true;
+    if (body.length < 2600 && textLen < 250) return true;
+    return false;
   }
 
   function retro(html, baseUrl) {
@@ -60,11 +80,56 @@ W98.WebFetch = (() => {
     /* strip obvious non-content regions before extracting */
     doc.querySelectorAll("nav, header, footer, aside, [role=navigation], [role=banner], [role=contentinfo], .nav, .navbar, .menu, .sidebar, .footer, .header, #footer, #header, #mw-navigation, #p-lang, .mw-editsection, .navbox, .vector-menu, style, script").forEach(n => n.remove());
     /* prefer a real article/content region, most specific first */
-    const root = doc.querySelector("#mw-content-text .mw-parser-output, #mw-content-text, .mw-parser-output, .post-content, .entry-content, .article-body, .article__body, [itemprop=articleBody], article, main, [role=main]") || doc.body || doc.documentElement;
+    const root = doc.querySelector("#mw-content-text .mw-parser-output, #mw-content-text, .mw-parser-output, .post-content, .entry-content, .article-body, .article__body, [itemprop=articleBody], #search, #rso, #b_results, article, main, [role=main]") || doc.body || doc.documentElement;
+    /* search pages keep their query form even when we narrow to a content root */
+    const headForm = root !== doc.body && doc.querySelector("form[action*='search'], form[role=search]");
 
     let out = "";
     let textBudget = 60000;   /* stop after a reasonable amount */
-    let imgCount = 0, linkCount = 0;
+    let imgCount = 0, linkCount = 0, formCount = 0;
+
+    /* re-render a form's controls in Win98 dress, keeping names/values so it still submits */
+    function walkForm(node) {
+      let s = "";
+      for (const c of node.childNodes) {
+        if (c.nodeType === 3) { const t = ESC(c.nodeValue.replace(/\s+/g, " ")); if (t.trim()) s += t; continue; }
+        if (c.nodeType !== 1) continue;
+        const tag = c.tagName;
+        if (/^(SCRIPT|STYLE|NOSCRIPT|SVG|IFRAME|TEMPLATE)$/.test(tag)) continue;
+        if (tag === "INPUT") {
+          const ty = (c.getAttribute("type") || "text").toLowerCase();
+          const name = c.getAttribute("name") || "";
+          const val = c.getAttribute("value") || "";
+          if (ty === "hidden") s += `<input type="hidden" name="${ESC(name)}" value="${ESC(val)}">`;
+          else if (ty === "submit" || ty === "image") s += ` <button class="btn" data-submit>${ESC(val || "Submit")}</button> `;
+          else if (ty === "checkbox" || ty === "radio")
+            s += `<label><input type="${ty}" name="${ESC(name)}" value="${ESC(val || "on")}"${c.hasAttribute("checked") ? " checked" : ""}> ${ESC(c.getAttribute("aria-label") || "")}</label> `;
+          else if (ty === "password") continue;   /* 1998 knew better than to type passwords here */
+          else if (name) s += `<input class="field" type="text" name="${ESC(name)}" value="${ESC(val)}" placeholder="${ESC(c.getAttribute("placeholder") || "")}" style="width:280px"> `;
+        } else if (tag === "TEXTAREA") {
+          const name = c.getAttribute("name") || "";
+          if (name) s += `<input class="field" type="text" name="${ESC(name)}" value="${ESC(c.textContent.trim().slice(0, 400))}" placeholder="${ESC(c.getAttribute("placeholder") || "")}" style="width:280px"> `;
+        } else if (tag === "SELECT") {
+          const name = c.getAttribute("name") || "";
+          if (name) {
+            s += `<select name="${ESC(name)}">`;
+            c.querySelectorAll("option").forEach(o => {
+              s += `<option value="${ESC(o.getAttribute("value") != null ? o.getAttribute("value") : o.textContent)}"${o.hasAttribute("selected") ? " selected" : ""}>${ESC(o.textContent.trim().slice(0, 80))}</option>`;
+            });
+            s += `</select> `;
+          }
+        } else if (tag === "BUTTON") {
+          const ty = (c.getAttribute("type") || "submit").toLowerCase();
+          if (ty === "submit") s += ` <button class="btn" data-submit>${ESC(c.textContent.trim() || "Submit")}</button> `;
+        } else if (tag === "LABEL") {
+          const t = ESC(c.textContent.replace(/\s+/g, " ").trim());
+          s += t ? t + " " + walkForm(c) : walkForm(c);
+        } else {
+          s += walkForm(c);
+        }
+      }
+      return s;
+    }
 
     function inline(node) {
       let s = "";
@@ -92,7 +157,18 @@ W98.WebFetch = (() => {
         if (textBudget <= 0) return;
         if (c.nodeType !== 1) continue;
         const tag = c.tagName;
-        if (/^(SCRIPT|STYLE|NOSCRIPT|SVG|IFRAME|TEMPLATE|LINK|META|BUTTON|INPUT|SELECT|FORM|NAV|VIDEO|AUDIO|CANVAS)$/.test(tag)) continue;
+        if (/^(SCRIPT|STYLE|NOSCRIPT|SVG|IFRAME|TEMPLATE|LINK|META|BUTTON|INPUT|SELECT|NAV|VIDEO|AUDIO|CANVAS)$/.test(tag)) continue;
+        if (tag === "FORM") {
+          const action = absUrl(c.getAttribute("action") || "", baseUrl);
+          const method = (c.getAttribute("method") || "get").toLowerCase();
+          const inner = walkForm(c).trim();
+          /* only keep forms that have a usable control and a same-web action */
+          if (action && inner && /<(input|select|button)/i.test(inner) && formCount < 10) {
+            formCount++;
+            out += `<form class="live-form" data-liveform="1" data-action="${ESC(action)}" data-method="${ESC(method)}">${inner}</form>`;
+          }
+          continue;
+        }
         if (HEADINGS[tag]) {
           const t = inline(c).trim();
           if (t) out += `<h${HEADINGS[tag] + 1 > 4 ? 4 : Math.min(3, parseInt(tag[1]))}>${t}</h${Math.min(3, parseInt(tag[1]))}>`;
@@ -143,6 +219,7 @@ W98.WebFetch = (() => {
         }
       }
     }
+    if (headForm) walk({ childNodes: [headForm] });
     walk(root);
 
     if (!out.trim()) {
@@ -153,5 +230,5 @@ W98.WebFetch = (() => {
     return { title, body: out, imgCount, linkCount };
   }
 
-  return { fetchUrl, retro, __reply };
+  return { fetchUrl, retro, looksBlocked, __reply };
 })();

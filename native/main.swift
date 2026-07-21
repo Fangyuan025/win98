@@ -152,11 +152,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
                         }
                     }
                 case "fetchUrl":
-                    // {cmd:"fetchUrl", url, reqId} → IE's retro web renderer
+                    // {cmd:"fetchUrl", url, reqId, render} → IE's retro web renderer
                     guard let urlStr = dict["url"] as? String,
                           let reqId = dict["reqId"] as? String,
                           let url = URL(string: urlStr) else { break }
-                    fetchWeb(url, reqId: reqId)
+                    if (dict["render"] as? Bool) == true {
+                        renderWeb(url, reqId: reqId)
+                    } else {
+                        fetchWeb(url, reqId: reqId)
+                    }
                 default: break
                 }
             }
@@ -164,40 +168,136 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         }
     }
 
+    static let fetchUA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15"
+
     private lazy var webSession: URLSession = {
         let cfg = URLSessionConfiguration.ephemeral
         cfg.timeoutIntervalForRequest = 12
         cfg.httpAdditionalHeaders = [
-            "User-Agent": "Mozilla/4.0 (compatible; MSIE 5.0; Windows 98)",
+            "User-Agent": AppDelegate.fetchUA,
             "Accept": "text/html,application/xhtml+xml,text/plain,*/*",
+            "Accept-Language": "en-US,en;q=0.8",
         ]
         return URLSession(configuration: cfg)
     }()
 
+    private func decodeBody(_ data: Data, contentType: String) -> String {
+        // honor the declared charset before falling back to UTF-8 / Latin-1
+        if let r = contentType.range(of: "charset=", options: .caseInsensitive) {
+            let name = contentType[r.upperBound...].prefix(while: { $0.isLetter || $0.isNumber || $0 == "-" }).lowercased()
+            let encodings: [String: String.Encoding] = [
+                "utf-8": .utf8, "iso-8859-1": .isoLatin1, "latin-1": .isoLatin1,
+                "windows-1252": .windowsCP1252, "shift_jis": .shiftJIS, "euc-jp": .japaneseEUC,
+                "gbk": String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(CFStringEncodings.GB_18030_2000.rawValue))),
+                "gb2312": String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(CFStringEncodings.GB_18030_2000.rawValue))),
+                "big5": String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(CFStringEncodings.big5.rawValue))),
+            ]
+            if let enc = encodings[String(name)], let s = String(data: data, encoding: enc) { return s }
+        }
+        return String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1) ?? String(decoding: data, as: UTF8.self)
+    }
+
+    private func replyFetch(_ reqId: String, _ result: [String: Any]) {
+        let json = (try? JSONSerialization.data(withJSONObject: result)).flatMap { String(data: $0, encoding: .utf8) } ?? "{\"ok\":false,\"error\":\"encode failed\"}"
+        DispatchQueue.main.async {
+            // hand the JSON string to JS as a single safely-quoted argument
+            let arg = (try? JSONSerialization.data(withJSONObject: [json])).flatMap { String(data: $0, encoding: .utf8) } ?? "[\"\"]"
+            self.webView.evaluateJavaScript("W98.WebFetch.__reply(\"\(reqId)\", \(arg)[0]);", completionHandler: nil)
+        }
+    }
+
     private func fetchWeb(_ url: URL, reqId: String) {
         let task = webSession.dataTask(with: url) { [weak self] data, response, error in
+            guard let self = self else { return }
             var result: [String: Any]
             if let error = error {
                 result = ["ok": false, "error": error.localizedDescription]
             } else if let http = response as? HTTPURLResponse {
                 let ct = http.value(forHTTPHeaderField: "Content-Type") ?? "text/html"
-                var text = ""
-                if let d = data { text = String(data: d, encoding: .utf8) ?? String(decoding: d, as: UTF8.self) }
+                let text = data.map { self.decodeBody($0, contentType: ct) } ?? ""
                 result = ["ok": true, "status": http.statusCode, "contentType": ct,
                           "finalUrl": http.url?.absoluteString ?? url.absoluteString, "body": text]
             } else {
                 result = ["ok": false, "error": "no response"]
             }
-            let json = (try? JSONSerialization.data(withJSONObject: result)).flatMap { String(data: $0, encoding: .utf8) } ?? "{\"ok\":false,\"error\":\"encode failed\"}"
-            DispatchQueue.main.async {
-                // hand the JSON string to JS as a single safely-quoted argument
-                let arg = (try? JSONSerialization.data(withJSONObject: [json])).flatMap { String(data: $0, encoding: .utf8) } ?? "[\"\"]"
-                self?.webView.evaluateJavaScript("W98.WebFetch.__reply(\"\(reqId)\", \(arg)[0]);", completionHandler: nil)
-            }
+            self.replyFetch(reqId, result)
         }
         task.resume()
     }
 
+    // MARK: - full-JS rendering for sites that refuse plain fetches (Google & friends)
+
+    private var renderers: [String: OffscreenRenderer] = [:]
+
+    private func renderWeb(_ url: URL, reqId: String) {
+        DispatchQueue.main.async {
+            let r = OffscreenRenderer(url: url) { [weak self] result in
+                self?.replyFetch(reqId, result)
+                self?.renderers.removeValue(forKey: reqId)
+            }
+            self.renderers[reqId] = r
+            r.start()
+        }
+    }
+}
+
+final class OffscreenRenderer: NSObject, WKNavigationDelegate {
+    private let url: URL
+    private let completion: ([String: Any]) -> Void
+    private var webView: WKWebView!
+    private var finished = false
+    private var timeoutTimer: Timer?
+
+    init(url: URL, completion: @escaping ([String: Any]) -> Void) {
+        self.url = url
+        self.completion = completion
+        super.init()
+        let cfg = WKWebViewConfiguration()
+        cfg.suppressesIncrementalRendering = true
+        webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 1024, height: 768), configuration: cfg)
+        webView.customUserAgent = AppDelegate.fetchUA
+        webView.navigationDelegate = self
+    }
+
+    func start() {
+        timeoutTimer = Timer.scheduledTimer(withTimeInterval: 20, repeats: false) { [weak self] _ in
+            self?.harvest()   // return whatever has rendered by now
+        }
+        webView.load(URLRequest(url: url))
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        // let client-side rendering settle before harvesting the DOM
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in self?.harvest() }
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { fail(error) }
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { fail(error) }
+
+    private func fail(_ error: Error) {
+        guard !finished else { return }
+        finished = true
+        timeoutTimer?.invalidate()
+        completion(["ok": false, "error": error.localizedDescription])
+    }
+
+    private func harvest() {
+        guard !finished else { return }
+        finished = true
+        timeoutTimer?.invalidate()
+        let finalUrl = webView.url?.absoluteString ?? url.absoluteString
+        webView.evaluateJavaScript("document.documentElement.outerHTML") { [completion] html, _ in
+            if let html = html as? String, !html.isEmpty {
+                completion(["ok": true, "status": 200, "contentType": "text/html; charset=utf-8",
+                            "finalUrl": finalUrl, "body": html])
+            } else {
+                completion(["ok": false, "error": "render produced no output"])
+            }
+        }
+    }
+}
+
+extension AppDelegate {
     private func buildMenu() {
         let mainMenu = NSMenu()
 
