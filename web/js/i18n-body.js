@@ -319,5 +319,18 @@ W98.I18N_BODY_ZH = {
     " 首頁在您搜尋之前只是個空殼，所以搜吧:",
   "Search ": "搜尋 ", "Search": "搜尋",
   "Results arrive as good honest text. Click any video and it plays in Media Player 98.":
-    "結果以誠實的純文字送達。點任何影片，就會在 Media Player 98 中播放。"
+    "結果以誠實的純文字送達。點任何影片，就會在 Media Player 98 中播放。",
+
+  /* ---- Media Player local files ---- */
+  "Open a video with File > Open URL / Open File — or drop a movie file from your Mac onto this window.":
+    "用 檔案 > 開啟 URL / 開啟檔案 來播放影片 — 或直接把 Mac 上的影片檔拖進這個視窗。",
+  "Open File...": "開啟檔案...",
+  "Playing local file — no modem required.": "播放本機檔案 — 不需要數據機。",
+  "local disk": "本機磁碟",
+  "This codec is not installed.": "未安裝這個解碼器。",
+  "(WebKit plays .mp4, .mov, .m4v and .webm. For the rest, 1998 suggests downloading a codec pack from a site you do not trust.)":
+    "（WebKit 可播放 .mp4、.mov、.m4v 和 .webm。其他格式，1998 年的建議是從一個您不信任的網站下載解碼器包。）",
+  "Cannot play this file.": "無法播放這個檔案。",
+  "One video at a time — it is 1998 and there is one video card.\nPlaying: ":
+    "一次一部影片 — 現在是 1998 年，只有一張顯示卡。\n正在播放: "
 };

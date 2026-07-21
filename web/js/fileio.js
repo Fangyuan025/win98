@@ -22,8 +22,23 @@ W98.FileIO = (() => {
     return FS.DESKTOP;
   }
 
+  const VIDEO_EXT = ["mp4", "m4v", "mov", "webm", "ogv", "avi", "mkv", "mpg", "mpeg", "wmv"];
+
   function importFiles(fileList, dir) {
-    const files = [...fileList].slice(0, MAX_FILES);
+    let files = [...fileList].slice(0, MAX_FILES);
+    if (!files.length) return;
+    /* video files skip the VFS (no 4 MB ceiling for movies even in 1998 dreams)
+       and go straight to Media Player 98 as session blob URLs */
+    const videos = files.filter(f => VIDEO_EXT.includes(extOf(f.name)) || (f.type && f.type.startsWith("video/")));
+    files = files.filter(f => !videos.includes(f));
+    if (videos.length) {
+      const v = videos[0];
+      W98.launch("mediaplayer", { local: true, name: v.name, url: URL.createObjectURL(v), type: v.type });
+      if (videos.length > 1) {
+        WM.msgbox({ title: "Media Player 98", icon: "info",
+          text: W98.tr("One video at a time — it is 1998 and there is one video card.\nPlaying: ") + v.name });
+      }
+    }
     if (!files.length) return;
     let done = 0, results = [];
     const finish = () => {

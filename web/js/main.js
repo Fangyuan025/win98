@@ -191,6 +191,8 @@
       app._netWrapped = true;
       const orig = app.launch.bind(app);
       app.launch = (a) => {
+        /* local video files need no modem */
+        if (id === "mediaplayer" && a && typeof a === "object" && a.local) return orig(a);
         if (!W98.Net || W98.Net.connected) return orig(a);
         W98.Net.require(() => W98.launch(id, a));
         return null;

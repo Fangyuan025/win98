@@ -53,8 +53,12 @@ W98.Apps = W98.Apps || {};
 
   W98.Apps.mediaplayer = {
     name: "Media Player 98", icon: "tv98", single: true,
-    reopen(w, url) { if (url && typeof url === "string" && w._play) w._play(url); },
-    launch(url) {
+    reopen(w, arg) {
+      if (!arg || !w._play) return;
+      if (typeof arg === "string") w._play(arg);
+      else if (arg.local) w._playLocal(arg);
+    },
+    launch(arg) {
       const win = WM.create({
         title: "Media Player 98", icon: "tv98", appId: "mediaplayer",
         width: 560, height: 460, minWidth: 380, minHeight: 300,
@@ -62,6 +66,7 @@ W98.Apps = W98.Apps || {};
         menus: [
           { label: "File", items: () => [
             { label: "Open URL...", click: openUrlDialog },
+            { label: "Open File...", click: openFileDialog },
             "-",
             { label: "Close", click: () => win.close() }
           ]},
@@ -91,7 +96,7 @@ W98.Apps = W98.Apps || {};
           style: "position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#c0c0c0;font-size:12px;text-align:center;gap:8px;padding:20px"
         },
           el("div", { style: "font-size:34px", text: "▶" }),
-          el("div", { text: W98.tr("Open a streaming video with File > Open URL...") }),
+          el("div", { text: W98.tr("Open a video with File > Open URL / Open File — or drop a movie file from your Mac onto this window.") }),
           el("div", { style: "font-size:10px;color:#808080", text: W98.tr("YouTube, Bilibili, Vimeo and Dailymotion links all work. The 28.8k modem will do its best.") })
         ));
       }
@@ -117,6 +122,45 @@ W98.Apps = W98.Apps || {};
       }
       win._play = play;
 
+      /* local files from a Finder drag or File > Open File... — the video tag
+         does the work, the chrome pretends it is 1998 */
+      function playLocal(v) {
+        stage.innerHTML = "";
+        const vid = el("video", {
+          src: v.url, controls: "", autoplay: "",
+          style: "position:absolute;inset:0;width:100%;height:100%;background:#000"
+        });
+        vid.addEventListener("error", () => {
+          stage.innerHTML = "";
+          stage.append(el("div", {
+            style: "position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#c0c0c0;font-size:12px;text-align:center;gap:8px;padding:20px"
+          },
+            el("div", { style: "font-size:30px", text: "✖" }),
+            el("div", { text: W98.tr("This codec is not installed.") }),
+            el("div", { style: "font-size:10px;color:#808080", text: W98.tr("(WebKit plays .mp4, .mov, .m4v and .webm. For the rest, 1998 suggests downloading a codec pack from a site you do not trust.)") })
+          ));
+          win.setStatus(0, W98.tr("Cannot play this file."));
+        });
+        stage.append(vid);
+        clipLabel.textContent = W98.tr("Clip: ") + v.name;
+        win.setTitle(v.name.slice(0, 40) + " - Media Player 98");
+        win.setStatus(0, W98.tr("Playing local file — no modem required."));
+        win.setStatus(1, W98.tr("local disk"));
+        Sound.play("click");
+      }
+      win._playLocal = playLocal;
+
+      function openFileDialog() {
+        const inp = el("input", { type: "file", accept: "video/*,.mp4,.m4v,.mov,.webm,.ogv,.avi,.mkv,.mpg,.wmv", style: "display:none" });
+        inp.addEventListener("change", () => {
+          const f = inp.files && inp.files[0];
+          if (f) playLocal({ name: f.name, url: URL.createObjectURL(f), type: f.type });
+          inp.remove();
+        });
+        document.body.append(inp);
+        inp.click();
+      }
+
       function openUrlDialog() {
         Dialogs.prompt({
           title: W98.tr("Open URL"),
@@ -125,7 +169,9 @@ W98.Apps = W98.Apps || {};
         }).then((v) => { if (v && v.trim()) play(v.trim()); });
       }
 
-      if (url && typeof url === "string") play(url); else splash();
+      if (arg && typeof arg === "string") play(arg);
+      else if (arg && arg.local) playLocal(arg);
+      else splash();
       return win;
     }
   };
