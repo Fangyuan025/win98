@@ -1,5 +1,13 @@
 # Windows 98 — Nostalgia Edition for macOS
 
+[![Release](https://img.shields.io/github/v/release/Fangyuan025/win98?color=008080&label=release)](https://github.com/Fangyuan025/win98/releases)
+![Platform](https://img.shields.io/badge/platform-macOS-000080)
+![Made with](https://img.shields.io/badge/Swift%20%2B%20JavaScript-zero%20dependencies-c0c0c0)
+![Programs](https://img.shields.io/badge/programs-61-3f7fc0)
+![Games](https://img.shields.io/badge/games-14-40c040)
+![Languages](https://img.shields.io/badge/UI-English%20%C2%B7%20%E7%B9%81%E9%AB%94%E4%B8%AD%E6%96%87-da7756)
+![800x600](https://img.shields.io/badge/best%20viewed%20at-800%C3%97600-008080)
+
 **English** · [繁體中文](#windows-98--macos-懷舊復刻版)
 
 A fully interactive recreation of a lived-in 1998 PC, shipped as a tiny native macOS app.
