@@ -3,7 +3,8 @@
    unknown strings pass through unchanged so nothing can go missing. */
 "use strict";
 (() => {
-  const lang = Store.get("uiLang", "en");
+  const qlang = (location.search.match(/[?&]lang=([\w-]+)/) || [])[1];
+  const lang = qlang || Store.get("uiLang", "en");
   W98.uiLang = lang;
 
   /* zh-TW dictionary. Keys are the exact English source strings. */

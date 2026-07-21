@@ -184,6 +184,15 @@
     Taskbar.init();
     W98.Screensaver && W98.Screensaver.init();
     Boot.run().then(() => {
+      if (location.search.includes("demo=1")) {
+        setTimeout(() => {
+          const place = (w, x2, y2) => { if (w && w.el) { w.el.style.left = x2 + "px"; w.el.style.top = y2 + "px"; } };
+          place(W98.launch("minesweeper"), 48, 84);
+          place(W98.launch("ie"), 430, 44);
+          place(W98.launch("claude98"), 200, 330);
+        }, 700);
+        return;
+      }
       setTimeout(showWelcome, 350);
       setTimeout(() => { W98.Stickies && W98.Stickies.restore(); W98.ChannelBar && W98.ChannelBar.init(); }, 500);
     });
