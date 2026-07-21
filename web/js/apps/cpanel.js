@@ -282,6 +282,52 @@ W98.Screensaver = (() => {
 })();
 
 /* ================= Display Properties ================= */
+/* ================= Display mode: resolution + color depth ================= */
+W98.DisplayMode = (() => {
+  const RES = { auto: null, "1024": [1024, 768], "800": [800, 600], "640": [640, 480] };
+  const DEPTHS = {
+    "true": null,
+    "high": "0 .07 .13 .2 .27 .33 .4 .47 .53 .6 .67 .73 .8 .87 .93 1",
+    "256": "0 .2 .4 .6 .8 1",
+    "16": "0 .5 1"
+  };
+  let styleEl = null, svgEl = null;
+  function ensure() {
+    if (!styleEl) { styleEl = document.createElement("style"); document.head.append(styleEl); }
+    if (!svgEl) {
+      svgEl = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svgEl.setAttribute("style", "position:absolute;width:0;height:0");
+      document.body.append(svgEl);
+    }
+  }
+  function apply() {
+    ensure();
+    const res = Store.get("dispRes", "auto");
+    const depth = Store.get("dispDepth", "true");
+    let css = "";
+    const dims = RES[res];
+    if (dims) {
+      css += `#screen { inset: auto !important; left: 50% !important; top: 50% !important;
+        transform: translate(-50%, -50%); width: ${dims[0]}px !important; height: ${dims[1]}px !important;
+        box-shadow: 0 0 0 4000px #000; }
+      body { background: #000; }\n`;
+    }
+    const table = DEPTHS[depth];
+    if (table) {
+      svgEl.innerHTML = `<filter id="w98depth" color-interpolation-filters="sRGB">
+        <feComponentTransfer>
+          <feFuncR type="discrete" tableValues="${table}"/>
+          <feFuncG type="discrete" tableValues="${table}"/>
+          <feFuncB type="discrete" tableValues="${table}"/>
+        </feComponentTransfer></filter>`;
+      css += `#screen { filter: url(#w98depth); }\n`;
+    } else svgEl.innerHTML = "";
+    styleEl.textContent = css;
+    if (W98.Desktop && W98.Desktop.render) setTimeout(() => W98.Desktop.render(), 60);
+  }
+  return { apply, RES, DEPTHS };
+})();
+
 W98.Apps.display = {
   name: "Display Properties", icon: "display", single: true,
   launch() {
@@ -386,6 +432,39 @@ W98.Apps.display = {
             el("div", { style: "display:flex;gap:8px;align-items:center;margin-top:10px" },
               el("span", { text: "Wait:" }), waitInp, el("span", { text: "minutes of inactivity" }))
           );
+        }
+      },
+      {
+        label: "Settings",
+        build(page) {
+          /* monitor picture */
+          const mon = el("div", { style: "width:150px;height:112px;margin:2px auto 10px;background:#c8c4b8;border:2px solid #404040;border-radius:6px;padding:8px" },
+            el("div", { style: "width:100%;height:100%;background:linear-gradient(135deg,#0a7a7a,#008080);border:2px solid #202020" }));
+          page.append(mon);
+          page.append(el("div", { style: "margin-bottom:3px", text: "Colors:" }));
+          const depthSel = el("select", { class: "field", style: "width:100%" });
+          [["true", "True Color (32 bit)"], ["high", "High Color (16 bit)"], ["256", "256 Colors"], ["16", "16 Colors (a mistake)"]].forEach(([v, l]) => {
+            const o = el("option", { value: v, text: W98.tr(l) });
+            if (v === Store.get("dispDepth", "true")) o.selected = true;
+            depthSel.append(o);
+          });
+          depthSel.addEventListener("change", () => { Store.set("dispDepth", depthSel.value); W98.DisplayMode.apply(); Sound.play("click"); });
+          page.append(depthSel);
+          page.append(el("div", { style: "margin:10px 0 3px", text: "Screen area:" }));
+          const MODES = ["640", "800", "1024", "auto"];
+          const LABELS = { "640": "640 × 480", "800": "800 × 600", "1024": "1024 × 768", auto: W98.tr("Match window (modern luxury)") };
+          const slider = el("input", { type: "range", min: "0", max: "3", style: "width:100%" });
+          slider.value = String(Math.max(0, MODES.indexOf(Store.get("dispRes", "auto"))));
+          const areaLbl = el("div", { style: "text-align:center;font-size:11px;margin-top:2px", text: LABELS[Store.get("dispRes", "auto")] });
+          slider.addEventListener("input", () => {
+            const mode = MODES[parseInt(slider.value, 10)];
+            areaLbl.textContent = LABELS[mode];
+            Store.set("dispRes", mode);
+            W98.DisplayMode.apply();
+          });
+          page.append(slider, areaLbl);
+          page.append(el("div", { style: "margin-top:12px;font-size:11px;color:#606060;line-height:1.5",
+            text: W98.tr("Lower settings apply instantly and are letterboxed, the way your monitor's OSD would have insisted. 16 colors is exactly as bad as you remember.") }));
         }
       },
       {

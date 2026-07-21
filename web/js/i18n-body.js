@@ -244,5 +244,25 @@ W98.I18N_BODY_ZH = {
   "LOCAL FORECAST": "地區天氣預報", "CALL NOW: 555-SHOP": "現在就打: 555-SHOP",
   "Only ": "只剩 ", " left! (number may be theatrical)": " 件！（數字可能有戲劇成分）",
   "THE DUCK HOUR": "鴨鴨時間",
-  "Forecast accuracy not guaranteed before, during, or after 1998.": "預報準確度在 1998 年前、中、後皆不保證。"
+  "Forecast accuracy not guaranteed before, during, or after 1998.": "預報準確度在 1998 年前、中、後皆不保證。",
+
+  /* ---- Spider / SysMon / Display Settings ---- */
+  "Spider Solitaire": "連環新接龍", "Easy (1 suit)": "簡單（一種花色）", "Medium (2 suits)": "中等（兩種花色）",
+  "Hard (4 suits)": "困難（四種花色）", "Difficulty": "難度",
+  "Score: ": "分數: ", "Moves: ": "步數: ", "Runs: ": "完成組: ", "Deal a new row": "發一排新牌",
+  "You cleared all eight runs!\nScore: ": "您完成了全部八組！\n分數: ", "Deal again?": "要再發牌嗎？",
+  "You cannot deal while a column is empty.\nEvery column must hold at least one card.":
+    "有空欄時不能發牌。\n每一欄至少要有一張牌。",
+  "Build down in any suit; only same-suit runs move together.\nComplete a King-to-Ace run in one suit to clear it — clear all eight to win.\n\nClick the stock (top left) to deal a new row: every column must be occupied first.\n\nClick a card, then its destination. Empty columns take anything.\nOne suit is honest. Four suits is a lifestyle.":
+    "不分花色皆可往下疊；但只有同花色的連續牌可以一起搬動。\n湊齊同花色 K 到 A 即可清除一組 — 清完八組獲勝。\n\n點左上角牌堆發一排新牌：發牌前每一欄都必須有牌。\n\n點一張牌、再點目的地。空欄可放任何牌。\n一種花色是誠實模式，四種花色是一種生活方式。",
+  "System Monitor": "系統監視器", "Windows open: ": "開啟視窗: ", "System resources: ": "系統資源: ", "% free": "% 可用",
+  "Kernel: Processor Usage (%)": "核心: 處理器使用率 (%)",
+  "Memory Manager: Allocated (MB)": "記憶體管理: 已配置 (MB)",
+  "Dial-Up: Bytes Received/sec": "撥號網路: 每秒接收位元組",
+  "Settings": "設定", "Colors:": "色彩:", "Screen area:": "螢幕區域:",
+  "True Color (32 bit)": "全彩 (32 位元)", "High Color (16 bit)": "高彩 (16 位元)",
+  "256 Colors": "256 色", "16 Colors (a mistake)": "16 色（一個錯誤）",
+  "Match window (modern luxury)": "符合視窗大小（現代的奢侈）",
+  "Lower settings apply instantly and are letterboxed, the way your monitor's OSD would have insisted. 16 colors is exactly as bad as you remember.":
+    "較低的設定會立即套用並以黑邊呈現，就像當年螢幕 OSD 的堅持。16 色和您記憶中的一樣糟。"
 };

@@ -59,6 +59,7 @@ W98.Apps.run = {
       composer: "composer", tracker: "composer",
       megademo: "megademo", demo: "megademo",
       tv: "tv98", tv98: "tv98", deskpet: "deskpet", pet: "deskpet", tamago: "deskpet",
+      spider: "spider", sysmon: "sysmon", perfmon: "sysmon",
       photogoo: "photogoo", goo: "photogoo", netmeet: "netmeet", netmeeting: "netmeet",
       pagecrafter: "pagecrafter", frontpage: "pagecrafter", homepage: "pagecrafter",
       realplay: "surreal", realplayer: "surreal",

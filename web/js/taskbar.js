@@ -32,6 +32,7 @@ const Taskbar = W98.Taskbar = (() => {
           { label: "Minesweeper", icon: "minesweeper", click: () => W98.launch("minesweeper") },
           { label: "Powder Hill", icon: "ski", click: () => W98.launch("ski") },
           { label: "Solitaire", icon: "solitaire", click: () => W98.launch("solitaire") },
+          { label: "Spider Solitaire", icon: "spider", click: () => W98.launch("spider") },
           { label: "Stackz", icon: "stackz", click: () => W98.launch("stackz") },
           { label: "Star Pilot Pinball", icon: "pinball", click: () => W98.launch("pinball") },
           { label: "WallBall", icon: "wallball", click: () => W98.launch("wallball") },
@@ -50,6 +51,7 @@ const Taskbar = W98.Taskbar = (() => {
           { label: "Disk Defragmenter", icon: "defrag", click: () => W98.launch("defrag") },
           { label: "Registry Editor", icon: "exefile", click: () => W98.launch("regedit") },
           { label: "ScanDisk", icon: "scandisk", click: () => W98.launch("scandisk") },
+          { label: "System Monitor", icon: "sysmon", click: () => W98.launch("sysmon") },
           { label: "VirusScan 98", icon: "shield", click: () => W98.launch("vscan") }
         ]},
         { label: "Encyclopedia 98", icon: "encarta", click: () => W98.launch("encarta") },

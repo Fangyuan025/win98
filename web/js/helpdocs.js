@@ -84,7 +84,7 @@ W98.HelpTopics = {
     <ul>
       <li><b>Right-click the desktop</b> — arrange icons, create folders and files, change Properties.</li>
       <li><b>Display Properties</b> — wallpaper (tile/center/stretch, or one you drew in Paint),
-        appearance schemes, and screen savers.</li>
+        appearance schemes, screen savers — and a <b>Settings</b> tab with 640×480/800×600 screen areas and 16/256-color modes that apply instantly.</li>
       <li><b>Screen savers</b> — 3D Maze, Plasma, Starfield, Mystify, Flying Windows, Pipes,
         Scrolling Marquee. Set a wait time and they engage on idle; move the mouse to return.</li>
       <li><b>Desktop Themes</b> — coordinated color schemes from the Control Panel.</li>
@@ -373,7 +373,7 @@ W98.HelpTopics = {
     <h2>The games shelf</h2>
     <p>Start → Programs → Accessories → Games. Fourteen in total:</p>
     <ul>
-      <li><b>Cards</b> — Solitaire, FreeCell, Hearts</li>
+      <li><b>Cards</b> — Solitaire, FreeCell, Hearts, Spider Solitaire (1/2/4 suits)</li>
       <li><b>Classics</b> — Minesweeper, Star Pilot Pinball</li>
       <li><b>Arcade</b> — Powder Hill (ski), WallBall, Worm 98, Stackz</li>
       <li><b>3D</b> — CORRIDOR 98 (on the desktop)</li>

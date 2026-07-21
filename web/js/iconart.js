@@ -143,6 +143,38 @@
   draws.tree_pc = computerBox;
 
   /* ---------- Network Neighborhood ---------- */
+  draws.spider = x => {
+    /* card with a little spider */
+    x.fillStyle = "#fff"; rr(x, 6, 3, 20, 26, 2); x.fill();
+    x.strokeStyle = "#808080"; x.lineWidth = 0.8; rr(x, 6, 3, 20, 26, 2); x.stroke();
+    x.fillStyle = "#000"; x.font = "bold 7px Arial";
+    x.fillText("K", 8.5, 11); x.fillText("♠", 8.5, 18);
+    /* spider body */
+    x.fillStyle = "#202020";
+    x.beginPath(); x.ellipse(19, 19, 4, 5, 0, 0, 7); x.fill();
+    x.beginPath(); x.arc(19, 12.5, 2.6, 0, 7); x.fill();
+    x.strokeStyle = "#202020"; x.lineWidth = 1;
+    [[-1, -2], [-1.5, 0], [-1.2, 2], [-0.8, 4]].forEach(([dy, k], idx) => {
+      const yy = 15 + idx * 2.4;
+      x.beginPath(); x.moveTo(15.4, yy); x.quadraticCurveTo(11, yy - 2, 9.5, yy + 2); x.stroke();
+      x.beginPath(); x.moveTo(22.6, yy); x.quadraticCurveTo(27, yy - 2, 28.5, yy + 2); x.stroke();
+    });
+    x.strokeStyle = "#a0a0a0"; x.lineWidth = 0.6;
+    x.beginPath(); x.moveTo(19, 3); x.lineTo(19, 9.8); x.stroke();
+  };
+  draws.sysmon = x => {
+    x.fillStyle = "#000"; rr(x, 3, 4, 26, 24, 1.5); x.fill();
+    x.strokeStyle = "#004000"; x.lineWidth = 0.6;
+    for (let gy = 8; gy < 28; gy += 5) { x.beginPath(); x.moveTo(4, gy); x.lineTo(28, gy); x.stroke(); }
+    x.strokeStyle = "#00d000"; x.lineWidth = 1.6;
+    x.beginPath();
+    [[4, 22], [8, 18], [11, 20], [14, 10], [17, 14], [20, 8], [24, 13], [28, 9]].forEach(([px, py], i2) => i2 ? x.lineTo(px, py) : x.moveTo(px, py));
+    x.stroke();
+    x.strokeStyle = "#c00000"; x.lineWidth = 1.2;
+    x.beginPath();
+    [[4, 25], [9, 24], [13, 26], [18, 22], [23, 24], [28, 21]].forEach(([px, py], i2) => i2 ? x.lineTo(px, py) : x.moveTo(px, py));
+    x.stroke();
+  };
   draws.deskpet = x => {
     /* keychain egg-creature */
     x.fillStyle = "#e05090";

@@ -183,6 +183,7 @@
     W98.Desktop.init();
     Taskbar.init();
     W98.Screensaver && W98.Screensaver.init();
+    W98.DisplayMode && W98.DisplayMode.apply();
     Boot.run().then(() => {
       if (location.search.includes("demo=1")) {
         setTimeout(() => {
