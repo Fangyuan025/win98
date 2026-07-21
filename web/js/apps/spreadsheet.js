@@ -321,7 +321,7 @@ W98.Apps.spreadsheet = {
 
     /* toolbar */
     const tbar = el("div", { class: "toolbar" });
-    const mkTool = (label, icon, fn) => { const b = el("button", { class: "tool-btn", title: label }); b.append(Icons.img(icon, 20)); b.addEventListener("click", fn); tbar.append(b); return b; };
+    const mkTool = (label, icon, fn) => { const b = el("button", { class: "tool-btn", dataset: { tip: label } }); b.append(Icons.img(icon, 20)); b.addEventListener("click", fn); tbar.append(b); return b; };
     mkTool("New", "file", doNew);
     mkTool("Open", "folderopen", doOpen);
     mkTool("Save", "floppy", doSave);

@@ -225,6 +225,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
                             try? bytes.write(to: url)
                         }
                     }
+                case "renderPdf":
+                    // {cmd:"renderPdf", data:<base64>, page, scale, reqId} → PNG of one page
+                    guard let b64 = dict["data"] as? String,
+                          let reqId = dict["reqId"] as? String,
+                          let bytes = Data(base64Encoded: b64) else { break }
+                    let page = (dict["page"] as? Int) ?? 1
+                    let scale = (dict["scale"] as? Double) ?? 1.5
+                    DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                        self?.renderPdfPage(bytes, page: page, scale: CGFloat(scale), reqId: reqId)
+                    }
                 case "fetchUrl":
                     // {cmd:"fetchUrl", url, reqId, render} → IE's retro web renderer
                     guard let urlStr = dict["url"] as? String,
@@ -251,6 +261,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         panel.canChooseDirectories = false
         panel.begin { resp in
             completionHandler(resp == .OK ? panel.urls : nil)
+        }
+    }
+
+    private func renderPdfPage(_ data: Data, page: Int, scale: CGFloat, reqId: String) {
+        var result: [String: Any] = ["ok": false, "error": "cannot read PDF"]
+        if let provider = CGDataProvider(data: data as CFData),
+           let doc = CGPDFDocument(provider), doc.numberOfPages > 0 {
+            let n = min(max(1, page), doc.numberOfPages)
+            if let pg = doc.page(at: n) {
+                let box = pg.getBoxRect(.mediaBox)
+                let w = Int(box.width * scale), h = Int(box.height * scale)
+                if let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8,
+                                       bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
+                                       bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) {
+                    ctx.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
+                    ctx.fill(CGRect(x: 0, y: 0, width: CGFloat(w), height: CGFloat(h)))
+                    ctx.scaleBy(x: scale, y: scale)
+                    ctx.translateBy(x: -box.minX, y: -box.minY)
+                    ctx.drawPDFPage(pg)
+                    if let img = ctx.makeImage() {
+                        let rep = NSBitmapImageRep(cgImage: img)
+                        if let png = rep.representation(using: .png, properties: [:]) {
+                            result = ["ok": true, "pages": doc.numberOfPages, "page": n,
+                                      "png": "data:image/png;base64," + png.base64EncodedString()]
+                        }
+                    }
+                }
+            }
+        }
+        let json = (try? JSONSerialization.data(withJSONObject: result)).flatMap { String(data: $0, encoding: .utf8) } ?? "{\"ok\":false}"
+        DispatchQueue.main.async {
+            let arg = (try? JSONSerialization.data(withJSONObject: [json])).flatMap { String(data: $0, encoding: .utf8) } ?? "[\"\"]"
+            self.webView.evaluateJavaScript("W98.DocImport.__pdfReply(\"\(reqId)\", \(arg)[0]);", completionHandler: nil)
         }
     }
 

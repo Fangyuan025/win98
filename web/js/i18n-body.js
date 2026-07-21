@@ -340,5 +340,12 @@ W98.I18N_BODY_ZH = {
     "。\n\n檔案可能受保護、是空的，或比 1998 年所能禮貌應對的更現代。",
   "(Converted with the Word 98 import filter — the formatting stayed on the Mac.)":
     "（已用 Word 98 匯入濾鏡轉換 — 格式留在了 Mac 上。）",
-  "Slide": "投影片"
+  "Slide": "投影片",
+  "Rendering page...": "正在呈現頁面...",
+  "This PDF could not be rendered. It may be encrypted, or simply rude.":
+    "無法呈現這個 PDF。它可能被加密了，或者單純沒禮貌。",
+  "PDF pages render inside the native app. In the browser preview, the paper stays imaginary.":
+    "PDF 頁面在原生應用程式中呈現。在瀏覽器預覽裡，紙張仍是想像的。",
+  "Cannot display this document.": "無法顯示這份文件。",
+  "Previous Page": "上一頁", "Next Page": "下一頁", "Zoom In": "放大", "Zoom Out": "縮小"
 };

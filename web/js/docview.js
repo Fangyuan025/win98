@@ -176,22 +176,86 @@ W98.DocImport = (() => {
         W98.tr(".\n\nThe file may be protected, empty, or more modern than 1998 can politely handle.") });
   }
 
-  /* ---------- Acrobat Reader 98 ---------- */
+  /* ---------- Acrobat Reader 98 (pages rendered natively, chrome rendered in 1998) ---------- */
+  const pdfPending = {};
+  let pdfSeq = 0;
+  function __pdfReply(reqId, json) {
+    const cb = pdfPending[reqId];
+    if (!cb) return;
+    delete pdfPending[reqId];
+    let r; try { r = typeof json === "string" ? JSON.parse(json) : json; } catch (e) { r = { ok: false }; }
+    cb(r);
+  }
+  function renderPdfPage(b64, page, scale) {
+    return new Promise((resolve) => {
+      const bridge = window.webkit && webkit.messageHandlers && webkit.messageHandlers.system;
+      if (!bridge) { resolve({ ok: false, error: "no bridge" }); return; }
+      const reqId = "pdf" + (++pdfSeq);
+      pdfPending[reqId] = resolve;
+      bridge.postMessage({ cmd: "renderPdf", data: b64, page, scale, reqId });
+      setTimeout(() => { if (pdfPending[reqId]) { delete pdfPending[reqId]; resolve({ ok: false, error: "timeout" }); } }, 12000);
+    });
+  }
+
   function openPdf(path, dataUrl) {
     const name = FS.segs(path).pop();
+    const b64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
+    let cur = 1, total = 1, scale = 1.5;
+
     const win = WM.create({
       title: name + " - Acrobat Reader 98", icon: "help",
-      width: 640, height: 520, minWidth: 400, minHeight: 300,
+      width: 660, height: 540, minWidth: 420, minHeight: 320,
+      statusbar: [{ text: "Ready" }, { text: "100%", width: 70 }],
       menus: [
         { label: "File", items: () => [{ label: "Close", click: () => win.close() }] },
         { label: "Help", items: () => [{ label: "About Acrobat Reader 98", click: () =>
           Dialogs.about("Acrobat Reader 98", "help", ["The document looks exactly the same", "on every computer. Witchcraft."]) }] }
       ]
     });
-    win.body.style.background = "#808080";
-    win.body.append(el("iframe", {
-      src: dataUrl, style: "width:100%;height:100%;border:0;background:#808080"
-    }));
+    win.body.style.display = "flex";
+    win.body.style.flexDirection = "column";
+
+    const bPrev = el("button", { class: "btn mp-btn", text: "◀", dataset: { tip: "Previous Page" } });
+    const bNext = el("button", { class: "btn mp-btn", text: "▶", dataset: { tip: "Next Page" } });
+    const pageLbl = el("span", { class: "mp-time", style: "min-width:60px;text-align:center", text: "– / –" });
+    const bZoomOut = el("button", { class: "btn mp-btn", text: "−", dataset: { tip: "Zoom Out" } });
+    const bZoomIn = el("button", { class: "btn mp-btn", text: "+", dataset: { tip: "Zoom In" } });
+    const tbar = el("div", { class: "mp-controls" }, bPrev, bNext, pageLbl, el("span", { style: "flex:1" }), bZoomOut, bZoomIn);
+    const view = el("div", { style: "flex:1;overflow:auto;background:#808080;text-align:center;padding:12px;min-height:0" });
+    const img = el("img", { style: "background:#fff;box-shadow:2px 2px 4px rgba(0,0,0,.4);max-width:none" });
+    view.append(img);
+    win.body.append(tbar, view);
+
+    let busy = false;
+    async function show(page) {
+      if (busy || win.closed) return;
+      busy = true;
+      win.setStatus(0, W98.tr("Rendering page..."));
+      const r = await renderPdfPage(b64, page, scale);
+      busy = false;
+      if (win.closed) return;
+      if (!r.ok) {
+        view.innerHTML = "";
+        view.append(el("div", { style: "color:#fff;padding:40px;font-size:12px;text-align:center",
+          text: window.webkit ? W98.tr("This PDF could not be rendered. It may be encrypted, or simply rude.")
+                              : W98.tr("PDF pages render inside the native app. In the browser preview, the paper stays imaginary.") }));
+        win.setStatus(0, W98.tr("Cannot display this document."));
+        return;
+      }
+      cur = r.page; total = r.pages;
+      img.src = r.png;
+      if (!img.isConnected) { view.innerHTML = ""; view.append(img); }
+      pageLbl.textContent = cur + " / " + total;
+      bPrev.disabled = cur <= 1;
+      bNext.disabled = cur >= total;
+      win.setStatus(0, name);
+      win.setStatus(1, Math.round(scale / 1.5 * 100) + "%");
+    }
+    bPrev.addEventListener("click", () => show(cur - 1));
+    bNext.addEventListener("click", () => show(cur + 1));
+    bZoomIn.addEventListener("click", () => { scale = Math.min(4.5, scale * 1.25); show(cur); });
+    bZoomOut.addEventListener("click", () => { scale = Math.max(0.6, scale / 1.25); show(cur); });
+    show(1);
     return win;
   }
 
@@ -243,6 +307,7 @@ W98.DocImport = (() => {
 
   return {
     canOpen: (ext) => OPENABLE.includes(ext),
-    open
+    open,
+    __pdfReply
   };
 })();

@@ -334,7 +334,7 @@ W98.Apps.slides = {
     });
 
     const tbar = el("div", { class: "toolbar" });
-    const mkTool = (label, icon, fn) => { const b = el("button", { class: "tool-btn", title: label }); b.append(Icons.img(icon, 20), el("span", { text: label, style: "font-size:10px" })); b.addEventListener("click", fn); tbar.append(b); return b; };
+    const mkTool = (label, icon, fn) => { const b = el("button", { class: "tool-btn", dataset: { tip: label } }); b.append(Icons.img(icon, 20), el("span", { text: label, style: "font-size:10px" })); b.addEventListener("click", fn); tbar.append(b); return b; };
     mkTool("New Slide", "slidesdoc", addSlide);
     mkTool("Delete", "tb_del", delSlide);
     tbar.append(el("div", { class: "tsep" }));

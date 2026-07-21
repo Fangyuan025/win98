@@ -40,7 +40,7 @@ const Dialogs = W98.Dialogs = (() => {
 
       const topRow = el("div", { style: "display:flex;align-items:center;gap:6px;padding:6px 8px 4px;flex:none" });
       const lookSel = el("select", { class: "field", style: "flex:1;height:22px" });
-      const upBtn = el("button", { class: "btn", style: "min-width:26px;width:26px;height:22px;padding:0", title: "Up One Level" });
+      const upBtn = el("button", { class: "btn", style: "min-width:26px;width:26px;height:22px;padding:0", dataset: { tip: "Up One Level" } });
       upBtn.append(Icons.img("folderopen", 16));
       topRow.append(el("span", { text: mode === "open" ? "Look in:" : "Save in:" }), lookSel, upBtn);
 

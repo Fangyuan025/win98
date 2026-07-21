@@ -149,7 +149,7 @@ W98.Apps.wordpad = {
     /* toolbar */
     const tbar = el("div", { class: "toolbar" });
     const mkTool = (label, icon, fn) => {
-      const b = el("button", { class: "tool-btn", title: label, style: "min-width:22px" });
+      const b = el("button", { class: "tool-btn", dataset: { tip: label }, style: "min-width:22px" });
       b.append(Icons.img(icon, 20));
       b.addEventListener("click", fn);
       tbar.append(b);
@@ -184,7 +184,7 @@ W98.Apps.wordpad = {
     fbar.append(fontSel, sizeSel, el("div", { class: "tsep" }));
 
     const mkFmt = (label, fn, styler) => {
-      const b = el("button", { class: "tool-btn wp-fmt", title: label });
+      const b = el("button", { class: "tool-btn wp-fmt", dataset: { tip: label } });
       const s = el("span", { text: label[0], style: "font-size:13px;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-family:'Times New Roman',serif" });
       if (styler) styler(s);
       b.append(s);
@@ -196,14 +196,14 @@ W98.Apps.wordpad = {
     const boldBtn = mkFmt("Bold", () => exec("bold"), s => s.style.fontWeight = "700");
     const italBtn = mkFmt("Italic", () => exec("italic"), s => s.style.fontStyle = "italic");
     const undBtn = mkFmt("Underline", () => exec("underline"), s => s.style.textDecoration = "underline");
-    const colorBtn = el("button", { class: "tool-btn", title: "Color" });
+    const colorBtn = el("button", { class: "tool-btn", dataset: { tip: "Color" } });
     colorBtn.append(el("span", { text: "A", style: "font-size:13px;border-bottom:3px solid #e01f1f;padding:0 2px" }));
     colorBtn.addEventListener("mousedown", e => e.preventDefault());
     colorBtn.addEventListener("click", colorDialog);
     fbar.append(colorBtn, el("div", { class: "tsep" }));
 
     const mkAlign = (label, cmd) => {
-      const b = el("button", { class: "tool-btn wp-fmt", title: label });
+      const b = el("button", { class: "tool-btn wp-fmt", dataset: { tip: label } });
       const c = document.createElement("canvas"); c.width = 16; c.height = 16;
       const x = c.getContext("2d"); x.fillStyle = "#000";
       [11, 7, 11, 7].forEach((w, i) => {
@@ -222,7 +222,7 @@ W98.Apps.wordpad = {
     const alignL = mkAlign("Align Left", "justifyLeft");
     const alignC = mkAlign("Center", "justifyCenter");
     const alignR = mkAlign("Align Right", "justifyRight");
-    const bulletBtn = el("button", { class: "tool-btn wp-fmt", title: "Bullets" });
+    const bulletBtn = el("button", { class: "tool-btn wp-fmt", dataset: { tip: "Bullets" } });
     bulletBtn.append(el("span", { text: "•≡", style: "font-size:12px" }));
     bulletBtn.addEventListener("mousedown", e => e.preventDefault());
     bulletBtn.addEventListener("click", () => exec("insertUnorderedList"));
@@ -278,7 +278,7 @@ W98.Apps.wordpad = {
     let pixTimer = null, lastTrigger = -1;
     const pixBubble = el("div", { class: "px-bubble", text: "Hi! I'm Pixel. I live in WordPad now." });
     const pixCanvas = el("canvas", { width: 56, height: 44, style: "cursor:pointer" });
-    const pixClose = el("button", { class: "px-close", text: "×", title: "Hide Pixel" });
+    const pixClose = el("button", { class: "px-close", text: "×", dataset: { tip: "Hide Pixel" } });
     const pixPane = el("div", { class: "pixel-pane" }, pixBubble, pixCanvas, pixClose);
     win.el.append(pixPane);
     function drawPixel(blink) {

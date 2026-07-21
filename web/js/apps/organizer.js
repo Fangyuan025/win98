@@ -77,7 +77,7 @@ W98.Apps = W98.Apps || {};
         list.forEach((t, i) => {
           const row = el("div", { style: "display:flex;gap:6px;padding:1px 0;font-size:12px" },
             el("span", { text: "•" }), el("span", { style: "flex:1", text: t }));
-          const del = el("span", { text: "×", style: "cursor:pointer;color:#a00000;font-weight:700", title: "Remove" });
+          const del = el("span", { text: "×", style: "cursor:pointer;color:#a00000;font-weight:700", dataset: { tip: "Remove" } });
           del.addEventListener("click", () => {
             const ev = events();
             ev[k].splice(i, 1);
