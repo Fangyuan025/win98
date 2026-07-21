@@ -8,13 +8,20 @@ CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
 
+def _widen(enc):
+    """Legacy CJK labels lie: gb2312 pages ship GBK bytes, big5 pages ship HKSCS."""
+    e = enc.lower().replace("_", "-")
+    if e in ("gb2312", "gbk", "euc-cn", "gb-2312"): return "gb18030"
+    if e in ("big5", "big5-hkscs"): return "big5hkscs"
+    return enc
+
 def decode_body(body, content_type):
     """Decode fetched bytes honoring the declared charset, falling back sanely."""
     m = re.search(r"charset=([\w-]+)", content_type or "", re.I)
-    encs = [m.group(1)] if m else []
+    encs = [_widen(m.group(1))] if m else []
     head = body[:4096].decode("ascii", "ignore")
-    m2 = re.search(r'<meta[^>]+charset=["\']?([\w-]+)', head, re.I)
-    if m2: encs.append(m2.group(1))
+    m2 = re.search(r'<meta[^>]+charset=["\']?\s*([\w-]+)', head, re.I)
+    if m2: encs.append(_widen(m2.group(1)))
     encs += ["utf-8", "iso-8859-1"]
     for e in encs:
         try:

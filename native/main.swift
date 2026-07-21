@@ -181,20 +181,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         return URLSession(configuration: cfg)
     }()
 
+    /// IANA charset name → String.Encoding, with legacy CJK labels widened to their
+    /// real-world supersets (sites labeled gb2312 have shipped GBK bytes since 1999).
+    private func encodingFor(_ rawName: String) -> String.Encoding? {
+        var name = rawName.lowercased()
+        if name == "gb2312" || name == "gbk" || name == "gb18030" || name == "euc-cn" { name = "gb18030" }
+        if name == "big5" || name == "big5-hkscs" { name = "big5-hkscs" }
+        let cf = CFStringConvertIANACharSetNameToEncoding(name as CFString)
+        guard cf != kCFStringEncodingInvalidId else { return nil }
+        return String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(cf))
+    }
+
+    private func charsetName(in text: String) -> String? {
+        // charset=... either in a Content-Type header value or an HTML <meta> tag
+        guard let r = text.range(of: "charset=", options: .caseInsensitive) else { return nil }
+        let tail = text[r.upperBound...].drop(while: { $0 == "\"" || $0 == "'" || $0 == " " })
+        let name = tail.prefix(while: { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" })
+        return name.isEmpty ? nil : String(name)
+    }
+
     private func decodeBody(_ data: Data, contentType: String) -> String {
-        // honor the declared charset before falling back to UTF-8 / Latin-1
-        if let r = contentType.range(of: "charset=", options: .caseInsensitive) {
-            let name = contentType[r.upperBound...].prefix(while: { $0.isLetter || $0.isNumber || $0 == "-" }).lowercased()
-            let encodings: [String: String.Encoding] = [
-                "utf-8": .utf8, "iso-8859-1": .isoLatin1, "latin-1": .isoLatin1,
-                "windows-1252": .windowsCP1252, "shift_jis": .shiftJIS, "euc-jp": .japaneseEUC,
-                "gbk": String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(CFStringEncodings.GB_18030_2000.rawValue))),
-                "gb2312": String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(CFStringEncodings.GB_18030_2000.rawValue))),
-                "big5": String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(CFStringEncodings.big5.rawValue))),
-            ]
-            if let enc = encodings[String(name)], let s = String(data: data, encoding: enc) { return s }
+        var candidates: [String.Encoding] = []
+        // 1. charset declared in the HTTP header
+        if let n = charsetName(in: contentType), let e = encodingFor(n) { candidates.append(e) }
+        // 2. charset declared in a <meta> tag (how the 90s Chinese web actually did it)
+        let head = String(decoding: data.prefix(4096), as: UTF8.self)
+        if let n = charsetName(in: head), let e = encodingFor(n) { candidates.append(e) }
+        // 3. sane fallbacks: UTF-8 fails loudly on legacy CJK, Latin-1 never fails
+        candidates.append(.utf8)
+        for enc in candidates {
+            if let s = String(data: data, encoding: enc) { return s }
         }
-        return String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1) ?? String(decoding: data, as: UTF8.self)
+        return String(data: data, encoding: .isoLatin1) ?? String(decoding: data, as: UTF8.self)
     }
 
     private func replyFetch(_ reqId: String, _ result: [String: Any]) {
