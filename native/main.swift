@@ -116,6 +116,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
     func applicationDidFinishLaunching(_ notification: Notification) {
         let config = WKWebViewConfiguration()
         config.mediaTypesRequiringUserActionForPlayback = []
+        if #available(macOS 12.3, *) {
+            config.preferences.isElementFullscreenEnabled = true   // Media Player fullscreen button
+        }
         // Non-persistent store: app code is loaded fresh from the bundle each launch
         // (no stale resource cache). Real persistence goes through the state.json bridge below.
         config.websiteDataStore = WKWebsiteDataStore.nonPersistent()

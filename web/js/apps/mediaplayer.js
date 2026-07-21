@@ -177,7 +177,39 @@ W98.Apps = W98.Apps || {};
         bPlay.addEventListener("click", () => { if (vid.paused) vid.play(); else vid.pause(); });
         bStop.addEventListener("click", () => { vid.pause(); vid.currentTime = 0; });
         bMute.addEventListener("click", () => { vid.muted = !vid.muted; bMute.textContent = vid.muted ? "🔇" : "🔊"; });
-        bFull.addEventListener("click", () => { (vid.requestFullscreen || vid.webkitRequestFullscreen || (() => {})).call(vid); });
+        /* fullscreen the whole player body (video + 98 controls), Esc exits;
+           if the engine has no fullscreen API, maximize the window instead */
+        bFull.addEventListener("click", () => {
+          const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+          if (fsEl) {
+            (document.exitFullscreen || document.webkitExitFullscreen || (() => {})).call(document);
+            return;
+          }
+          const target = win.body;
+          const req = target.requestFullscreen || target.webkitRequestFullscreen;
+          const maximize = () => { if (win.toggleMax && !win.maximized) win.toggleMax(); };
+          if (req) {
+            /* real fullscreen when the engine grants it; if the request is denied
+               OR just left hanging, fall back to maximizing — 1998's fullscreen */
+            let settled = false;
+            const fallback = setTimeout(() => {
+              if (!settled && !document.fullscreenElement && !document.webkitFullscreenElement) maximize();
+            }, 900);
+            const p = req.call(target);
+            if (p && p.then) p.then(
+              () => { settled = true; clearTimeout(fallback); },
+              () => { settled = true; clearTimeout(fallback); maximize(); }
+            );
+          } else {
+            maximize();
+          }
+        });
+        document.addEventListener("fullscreenchange", function onFs() {
+          if (win.closed) { document.removeEventListener("fullscreenchange", onFs); return; }
+          const on = !!(document.fullscreenElement || document.webkitFullscreenElement);
+          bFull.textContent = on ? "⧉" : "⛶";
+          win.body.style.background = "#000";
+        });
         vid.addEventListener("play", () => { bPlay.textContent = "⏸"; });
         vid.addEventListener("pause", () => { bPlay.textContent = "▶"; });
         vid.addEventListener("timeupdate", () => {
