@@ -264,5 +264,14 @@ W98.I18N_BODY_ZH = {
   "256 Colors": "256 色", "16 Colors (a mistake)": "16 色（一個錯誤）",
   "Match window (modern luxury)": "符合視窗大小（現代的奢侈）",
   "Lower settings apply instantly and are letterboxed, the way your monitor's OSD would have insisted. 16 colors is exactly as bad as you remember.":
-    "較低的設定會立即套用並以黑邊呈現，就像當年螢幕 OSD 的堅持。16 色和您記憶中的一樣糟。"
+    "較低的設定會立即套用並以黑邊呈現，就像當年螢幕 OSD 的堅持。16 色和您記憶中的一樣糟。",
+
+  /* ---- Dial-up gating ---- */
+  "Dial-up Connection": "撥號連線",
+  "Select the service you want to connect to, and then enter your user name and password.":
+    "選擇您要連線的服務，然後輸入使用者名稱和密碼。",
+  "Connect to:": "連線到:", "Work Offline": "離線工作", "Working Offline": "離線工作中",
+  "The page cannot be displayed": "無法顯示網頁",
+  "The line is busy.\n\n(HyperTerminal is connected to the BBS. One phone line, one dream at a time.)":
+    "線路忙線中。\n\n（超級終端機正連著 BBS。一條電話線，一次一個夢想。）"
 };

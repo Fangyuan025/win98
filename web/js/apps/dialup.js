@@ -84,6 +84,41 @@ W98.Apps = W98.Apps || {};
     };
   }
 
+  /* ---------- the one true connection state ---------- */
+  W98.Net = {
+    get connected() { return !!connection; },
+    dial: (cb) => dialingWindow(cb),
+    disconnect,
+    status: statusDialog,
+    require(onConnect, onOffline) {
+      if (connection) { onConnect && onConnect(); return; }
+      const dw = WM.create({
+        title: "Dial-up Connection", icon: "dialup", width: 340, height: 0,
+        resizable: false, minimizable: false, maximizable: false, noTaskbar: true, center: true
+      });
+      dw.el.style.height = "auto";
+      dw.body.append(
+        el("div", { style: "display:flex;gap:14px;padding:14px 16px 6px" },
+          Icons.img("dialup", 32),
+          el("div", { style: "line-height:1.5" },
+            el("div", { text: "Select the service you want to connect to, and then enter your user name and password." }),
+            el("div", { style: "display:grid;grid-template-columns:auto 1fr;gap:4px 10px;margin-top:8px" },
+              el("span", { text: "Connect to:" }), el("b", { text: "My ISP" }),
+              el("span", { text: "User name:" }), el("span", { text: "nostalgic_user" }),
+              el("span", { text: "Password:" }), el("span", { text: "********" })))),
+        (() => {
+          const r = el("div", { class: "msgbox-btns" });
+          const con = el("button", { class: "btn default", text: "Connect" });
+          const off = el("button", { class: "btn", text: "Work Offline" });
+          con.addEventListener("click", () => { dw.close(true); dialingWindow(onConnect); });
+          off.addEventListener("click", () => { dw.close(true); onOffline && onOffline(); });
+          r.append(con, off);
+          return r;
+        })()
+      );
+    }
+  };
+
   W98.Apps.dialup = {
     name: "Dial-Up Networking", icon: "dialup", single: true,
     launch() {
@@ -215,7 +250,12 @@ W98.Apps = W98.Apps || {};
     }
   };
 
-  function dialingWindow() {
+  function dialingWindow(onDone) {
+    if (W98.bbsOnline) {
+      WM.msgbox({ title: "Connect To", icon: "error",
+        text: "The line is busy.\n\n(HyperTerminal is connected to the BBS. One phone line, one dream at a time.)" });
+      return;
+    }
     const win = WM.create({
       title: "Connecting to My ISP", icon: "dialup", appId: "dialup",
       width: 320, height: 0, resizable: false, maximizable: false, center: true
@@ -244,6 +284,7 @@ W98.Apps = W98.Apps || {};
       win.close(true);
       goOnline();
       Sound.play("info");
+      if (onDone) setTimeout(onDone, 300);
       const done = WM.create({
         title: "Connection Established", icon: "dialup", width: 330, height: 0,
         resizable: false, maximizable: false, noTaskbar: true, center: true

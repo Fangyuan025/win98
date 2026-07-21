@@ -207,7 +207,7 @@ W98.HelpTopics = {
 
   ie: ["Internet Explorer & the 1998 web", `
     <h2>Internet Explorer</h2>
-    <p>A museum of the 1998 internet — 19 sites, all interactive, all offline.</p>
+    <p>A museum of the 1998 internet — 19 sites, all interactive.</p>\n    <p><b>You must dial in first.</b> Opening a page offline shows the Dial-up Connection prompt —\n    Connect (the modem sings) or Work Offline (the page politely refuses). Disconnect any time via the\n    tray icon. While the BBS holds the phone line, the internet cannot; the reverse is also true.\n    It is one line. It was always one line.</p>
     <ul>
       <li><b>Start page</b> (welcome98.com) — channel links and the Featured Site of the Day.</li>
       <li><b>AltaVibe</b> — a search engine that totally finds things™. It indexes every site.</li>

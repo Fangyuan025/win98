@@ -30,7 +30,7 @@ W98.Apps.sysmon = {
         return Math.min(64, used + Math.random() * 3);
       }, max: 64 },
       { name: "Dial-Up: Bytes Received/sec", color: "#c00000", data: [], calc: () => {
-        const on = Store.get("dunConnected", false) || (Math.sin(Date.now() / 9000) > 0.3);
+        const on = W98.Net && W98.Net.connected;
         return on ? 1200 + Math.random() * 4400 + (Math.random() < 0.1 ? 1800 : 0) : Math.random() * 60;
       }, max: 7000 }
     ];

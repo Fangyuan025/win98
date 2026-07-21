@@ -22,6 +22,9 @@ W98.Apps.ie = {
       const [, verb, arg] = href.split(":");
       const cart = Store.get("cart", []);
       switch (verb) {
+        case "dialnow":
+          W98.Net.require(() => navigate(current, true));
+          return;
         case "linfr":
           Store.set("linLang", Store.get("linLang", "en") === "fr" ? "en" : "fr");
           navigate(current, true);
@@ -906,8 +909,40 @@ W98.Apps.ie = {
       pageEl.scrollTop = 0;
     }
 
+    function renderOffline(url) {
+      current = url;
+      addrInput.value = url;
+      stopThrobber();
+      win.setStatus(0, W98.tr("Working Offline"));
+      pageEl.innerHTML = "";
+      pageEl.append(style);
+      const wp = el("div", { class: "webpage", html: `
+        <div style="padding:36px 40px;font-family:'Times New Roman',serif">
+          <h2 style="font-size:18px">The page cannot be displayed</h2>
+          <p style="font-size:13px">You are currently working offline. The page you requested lives on
+          the Internet, and the Internet lives at the other end of a telephone call.</p>
+          <hr>
+          <p style="font-size:12px"><a href="act:dialnow:go"><b>Connect to the Internet</b></a> —
+          the modem is warmed up and ready to sing.</p>
+          <p style="font-size:11px;color:#666">Or open Dial-Up Networking from the Start menu, the way
+          your father insisted was more proper.</p>
+        </div>` });
+      $$("a", wp).forEach(a => {
+        const href = a.getAttribute("href") || "";
+        a.addEventListener("click", (e) => { e.preventDefault(); if (href.startsWith("act:")) pageAction(href); });
+      });
+      pageEl.append(wp);
+      win.setTitle(W98.tr("The page cannot be displayed") + " - Internet Explorer");
+    }
+
     function navigate(url, isReload) {
       if (!url) url = HOME;
+      if (W98.Net && !W98.Net.connected) {
+        const target = url;
+        W98.Net.require(() => { if (!win.closed) navigate(target, isReload); },
+                        () => { if (!win.closed) renderOffline(target); });
+        return;
+      }
       clearTimeout(loadTimer);
       startThrobber();
       stopBtn.disabled = false;

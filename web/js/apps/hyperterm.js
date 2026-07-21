@@ -80,6 +80,16 @@ W98.Apps = W98.Apps || {};
 
       function dial() {
         if (mode !== "offline") return;
+        if (W98.Net && W98.Net.connected) {
+          cls();
+          print("ATDT 555-8697");
+          print("BUSY");
+          print("");
+          print("The line is busy \u2014 Dial-Up Networking is using it.");
+          print("One phone line. Disconnect from the Internet first (tray icon).");
+          render();
+          return;
+        }
         mode = "dialing";
         cls();
         print("ATDT 555-8697");
@@ -94,12 +104,14 @@ W98.Apps = W98.Apps || {};
       }
       function hangup() {
         timers.forEach(clearTimeout);
+        W98.bbsOnline = false;
         mode = "offline";
         print("\nNO CARRIER");
         win.setTitle("HyperTerminal - (Disconnected)");
         win.setStatus(0, "Disconnected");
       }
       function welcome() {
+        W98.bbsOnline = true;
         mode = "menu";
         cls();
         print(TOWER);
@@ -306,7 +318,7 @@ W98.Apps = W98.Apps || {};
         }
       });
       screen.addEventListener("mousedown", () => win.el.focus());
-      win.opts.onClose = () => timers.forEach(t => { clearTimeout(t); clearInterval(t); });
+      win.opts.onClose = () => { W98.bbsOnline = false; timers.forEach(t => { clearTimeout(t); clearInterval(t); }); };
       render();
       return win;
     }

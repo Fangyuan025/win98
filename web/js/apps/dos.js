@@ -317,6 +317,13 @@ W98.Apps.dos = {
         };
         const rec = HOSTS[host];
         if (!rec) { print("Bad IP address " + host + ".\n(The 1998 internet has 16 websites. Spelling matters.)"); return; }
+        const isInternet = host.includes("fangyuanlin") || host.includes("chaty");
+        if (isInternet && W98.Net && !W98.Net.connected) {
+          print("\nPinging " + host + "...\n");
+          print("Destination host unreachable.");
+          print("(Dial-Up Networking is not connected. The internet is a phone call away.)");
+          return;
+        }
         const [ip, base] = rec;
         print("\nPinging " + host + " [" + ip + "] with 32 bytes of data:\n");
         let n = 0;
@@ -339,6 +346,11 @@ W98.Apps.dos = {
       },
       tracert(args) {
         const host = (args[0] || "fangyuanlin.com").toLowerCase();
+        if (W98.Net && !W98.Net.connected && !host.includes("pc") && !host.includes("office") && !host.includes("192.168")) {
+          print("\nUnable to resolve target system name " + host + ".");
+          print("(Connect with Dial-Up Networking first.)");
+          return;
+        }
         print("\nTracing route to " + host + " over a maximum of 30 hops:\n");
         const hops = [
           "  1     1 ms   192.168.0.1     the beige box with the lights",

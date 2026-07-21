@@ -166,6 +166,7 @@ W98.Apps = W98.Apps || {};
       }
 
       function sendReceive() {
+        if (W98.Net && !W98.Net.connected) { W98.Net.require(() => sendReceive()); return; }
         win.setStatus(1, "Connecting...");
         Sound.play("click");
         setTimeout(() => {
