@@ -57,6 +57,9 @@ W98.HelpTopics = {
         set them as wallpaper.</li>
       <li><b>Audio</b> (.mp3, .wav, .m4a…) — double-click for the mini audio player. Full fidelity,
         which is technically cheating for 1998.</li>
+      <li><b>Office documents</b> (.docx, .doc, .xlsx, .pptx, .pdf) — double-click to open:
+        Word files convert to WordPad text, spreadsheets open in the Spreadsheet, presentations
+        become an outline, and PDFs open in Acrobat Reader 98. The formatting stays on the Mac.</li>
       <li><b>Video</b> (.mp4, .mov, .m4v, .webm…) — drops straight into <b>Media Player 98</b>
         and plays immediately. No size limit: movies never touch the virtual disk.</li>
       <li>Limits: 12 files per drop, 4 MB per file (very un-1998 beyond that).</li>

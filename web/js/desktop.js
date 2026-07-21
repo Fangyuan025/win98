@@ -37,6 +37,7 @@ W98.openPath = function (path, depth) {
   if (data.startsWith("data:audio") || (["wav", "mp3", "m4a", "ogg", "aif", "aiff"].includes(e) && data.startsWith("data:"))) { W98.playAudioFile(path); return; }
   if (["bmp", "png", "jpg", "jpeg", "gif", "webp"].includes(e) || data.startsWith("data:image")) { W98.launch("paint", path); return; }
   if (data.startsWith("data:")) {
+    if (W98.DocImport && W98.DocImport.canOpen(e)) { W98.DocImport.open(path, e); return; }
     WM.msgbox({ title: FS.segs(path).pop(), icon: "info", text: "This file was imported from your Mac and has no program here.\n\nRight-click it and choose 'Export to Mac...' to send it back,\nor keep it as a souvenir." });
     return;
   }

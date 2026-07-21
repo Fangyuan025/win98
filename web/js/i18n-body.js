@@ -332,5 +332,13 @@ W98.I18N_BODY_ZH = {
     "（WebKit 可播放 .mp4、.mov、.m4v 和 .webm。其他格式，1998 年的建議是從一個您不信任的網站下載解碼器包。）",
   "Cannot play this file.": "無法播放這個檔案。",
   "One video at a time — it is 1998 and there is one video card.\nPlaying: ":
-    "一次一部影片 — 現在是 1998 年，只有一張顯示卡。\n正在播放: "
+    "一次一部影片 — 現在是 1998 年，只有一張顯示卡。\n正在播放: ",
+
+  /* ---- import filters ---- */
+  "The import filter could not read ": "匯入濾鏡無法讀取 ",
+  ".\n\nThe file may be protected, empty, or more modern than 1998 can politely handle.":
+    "。\n\n檔案可能受保護、是空的，或比 1998 年所能禮貌應對的更現代。",
+  "(Converted with the Word 98 import filter — the formatting stayed on the Mac.)":
+    "（已用 Word 98 匯入濾鏡轉換 — 格式留在了 Mac 上。）",
+  "Slide": "投影片"
 };

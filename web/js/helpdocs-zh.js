@@ -53,6 +53,9 @@ W98.HelpTopicsZh = {
       <li><b>文字檔</b>（.txt、.md、.csv、.html…）— 用記事本開啟編輯。</li>
       <li><b>圖片</b>（.png、.jpg、.gif、.bmp…）— 連按兩下用小畫家開啟；用照片捏捏樂捏它；設成桌布。</li>
       <li><b>音訊</b>（.mp3、.wav、.m4a…）— 連按兩下開啟迷你播放器。完整音質，對 1998 年來說是作弊。</li>
+      <li><b>Office 文件</b>（.docx、.doc、.xlsx、.pptx、.pdf）— 連按兩下即可開啟：
+        Word 檔轉成 WordPad 文字、試算表在試算表程式開啟、簡報變成大綱、PDF 用 Acrobat Reader 98 開啟。
+        格式留在 Mac 上。</li>
       <li><b>視訊</b>（.mp4、.mov、.m4v、.webm…）— 直接進 <b>Media Player 98</b> 立即播放。
         沒有大小限制：影片不會佔用虛擬磁碟。</li>
       <li>限制：每次 12 個檔案、每檔 4 MB（超過就太不 1998 了）。</li>
