@@ -1,8 +1,68 @@
 import Cocoa
 import WebKit
+import Network
+
+/// Serves the bundled web/ directory on 127.0.0.1 so the app runs from an
+/// http origin. file:// pages send no Referer, and the modern web (YouTube
+/// embeds in particular) refuses to talk to a browser with no Referer.
+final class LocalServer {
+    private var listener: NWListener?
+    private let root: URL
+    private let mimes: [String: String] = [
+        "html": "text/html; charset=utf-8", "js": "application/javascript; charset=utf-8",
+        "css": "text/css; charset=utf-8", "json": "application/json",
+        "png": "image/png", "gif": "image/gif", "jpg": "image/jpeg", "jpeg": "image/jpeg",
+        "ico": "image/x-icon", "svg": "image/svg+xml", "wav": "audio/wav", "mp3": "audio/mpeg",
+        "woff": "font/woff", "woff2": "font/woff2", "txt": "text/plain; charset=utf-8"
+    ]
+    init(root: URL) { self.root = root }
+
+    func start() -> UInt16 {
+        let params = NWParameters.tcp
+        params.requiredLocalEndpoint = NWEndpoint.hostPort(host: "127.0.0.1", port: .any)
+        guard let l = try? NWListener(using: params) else { return 0 }
+        listener = l
+        let sem = DispatchSemaphore(value: 0)
+        l.stateUpdateHandler = { st in
+            switch st { case .ready, .failed, .cancelled: sem.signal() default: break }
+        }
+        l.newConnectionHandler = { [weak self] conn in self?.handle(conn) }
+        l.start(queue: .global(qos: .userInitiated))
+        _ = sem.wait(timeout: .now() + 3)
+        return l.port?.rawValue ?? 0
+    }
+
+    private func handle(_ conn: NWConnection) {
+        conn.start(queue: .global(qos: .userInitiated))
+        conn.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, _, _ in
+            guard let self = self, let data = data,
+                  let req = String(data: data, encoding: .utf8) else { conn.cancel(); return }
+            let first = req.split(separator: "\r\n").first.map(String.init) ?? ""
+            let parts = first.split(separator: " ")
+            var path = parts.count > 1 ? String(parts[1]) : "/"
+            if let q = path.firstIndex(of: "?") { path = String(path[..<q]) }
+            path = path.removingPercentEncoding ?? path
+            if path == "/" || path.isEmpty { path = "/index.html" }
+            let clean = path.split(separator: "/").filter { $0 != ".." && $0 != "." }.joined(separator: "/")
+            let fileURL = self.root.appendingPathComponent(clean)
+            var status = "200 OK", mime = "application/octet-stream", body = Data()
+            let isDir = ((try? fileURL.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false) == true
+            if !isDir, let d = try? Data(contentsOf: fileURL) {
+                body = d
+                mime = self.mimes[fileURL.pathExtension.lowercased()] ?? mime
+            } else {
+                status = "404 Not Found"; mime = "text/plain"; body = Data("Not found".utf8)
+            }
+            let head = "HTTP/1.1 \(status)\r\nContent-Type: \(mime)\r\nContent-Length: \(body.count)\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n"
+            var out = Data(head.utf8); out.append(body)
+            conn.send(content: out, completion: .contentProcessed { _ in conn.cancel() })
+        }
+    }
+}
 
 final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WKNavigationDelegate {
     var window: NSWindow!
+    var localServer: LocalServer!
     var webView: WKWebView!
 
     var stateDir: URL {
@@ -101,8 +161,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         window.setFrameAutosaveName("Win98MainWindow")
 
         let resURL = Bundle.main.resourceURL!
-        let indexURL = resURL.appendingPathComponent("web/index.html")
-        webView.loadFileURL(indexURL, allowingReadAccessTo: resURL.appendingPathComponent("web", isDirectory: true))
+        let webRoot = resURL.appendingPathComponent("web", isDirectory: true)
+        // serve the UI from 127.0.0.1 so the page has an http origin (and thus a
+        // Referer header) — required by YouTube embeds, harmless everywhere else
+        localServer = LocalServer(root: webRoot)
+        let port = localServer.start()
+        if port > 0, let u = URL(string: "http://127.0.0.1:\(port)/index.html") {
+            webView.load(URLRequest(url: u))
+        } else {
+            webView.loadFileURL(webRoot.appendingPathComponent("index.html"), allowingReadAccessTo: webRoot)
+        }
 
         buildMenu()
         window.makeKeyAndOrderFront(nil)
@@ -286,7 +354,7 @@ final class OffscreenRenderer: NSObject, WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         // let client-side rendering settle before harvesting the DOM
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in self?.harvest() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.8) { [weak self] in self?.harvest() }
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { fail(error) }

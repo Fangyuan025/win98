@@ -879,6 +879,23 @@ W98.Apps.ie = {
       }
     }
 
+    const VIDEO_PORTALS = {
+      youtube: { name: "YouTube", search: (q) => "https://www.youtube.com/results?search_query=" + encodeURIComponent(q) },
+      bilibili: { name: "Bilibili", search: (q) => "https://search.bilibili.com/all?keyword=" + encodeURIComponent(q) },
+      vimeo: { name: "Vimeo", search: (q) => "https://vimeo.com/search?q=" + encodeURIComponent(q) },
+      dailymotion: { name: "Dailymotion", search: (q) => "https://www.dailymotion.com/search/" + encodeURIComponent(q) + "/videos" }
+    };
+    function videoPortalFor(url) {
+      try {
+        const u = new URL(url);
+        if (u.pathname !== "/" && u.pathname !== "") return null;
+        const h = u.hostname.toLowerCase().replace(/^www\.|^m\./, "");
+        const key = { "youtube.com": "youtube", "bilibili.com": "bilibili",
+                      "vimeo.com": "vimeo", "dailymotion.com": "dailymotion" }[h];
+        return key ? Object.assign({ key }, VIDEO_PORTALS[key]) : null;
+      } catch (e) { return null; }
+    }
+
     function siteFor(base) {
       if (SITES[base]) return base;
       // forgive a missing (or extra) www. so typed URLs resolve
@@ -918,6 +935,39 @@ W98.Apps.ie = {
         });
         pageEl.append(wp);
         win.setTitle(vid.site + " - Internet Explorer");
+        win.setStatus(0, "Done");
+        addrInput.value = url;
+        return;
+      }
+      /* video-site homepages are empty shells without login — serve a 98 portal
+         with a working search box instead (results render fine as text) */
+      const portal = !SITES[base] && videoPortalFor(url);
+      if (portal) {
+        pageEl.innerHTML = "";
+        pageEl.append(style);
+        const wp = el("div", { class: "webpage", html: `
+          <div style="background:#000080;color:#fff;padding:16px;text-align:center">
+            <span style="font-size:30px;font-family:'Times New Roman'">${portal.name}</span><br>
+            <span style="font-size:11px">${W98.tr("as seen from 1998 — text in the browser, moving pictures in Media Player 98")}</span>
+          </div>
+          <div style="padding:24px 40px;font-family:'Times New Roman',serif">
+            <p style="font-size:13px">${W98.tr("The modern ")}${portal.name}${W98.tr(" front page is an empty shell until you search, so search:")}</p>
+            <form data-vidsearch="${portal.key}" style="margin:10px 0">
+              <input name="q" style="width:300px;font-size:13px;border:2px inset #ccc;padding:3px" placeholder="${W98.tr("Search ")}${portal.name}...">
+              <button style="font-size:12px">${W98.tr("Search")}</button>
+            </form>
+            <p style="font-size:11px;color:#666">${W98.tr("Results arrive as good honest text. Click any video and it plays in Media Player 98.")}</p>
+          </div>` });
+        wireLinks(wp);
+        $$("form[data-vidsearch]", wp).forEach(f => {
+          f.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const q = f.elements.q.value.trim();
+            if (q) navigate(portal.search(q));
+          });
+        });
+        pageEl.append(wp);
+        win.setTitle(portal.name + " - Internet Explorer");
         win.setStatus(0, "Done");
         addrInput.value = url;
         return;

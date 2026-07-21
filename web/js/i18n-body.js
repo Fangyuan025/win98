@@ -311,5 +311,13 @@ W98.I18N_BODY_ZH = {
   "This link is a ": "這個連結是 ", " video. It opened in ": " 視訊，已在 ",
   " — in 1998, every file type got its own player, and we see no reason to change that.":
     " 中開啟 — 在 1998 年，每種檔案類型都有自己的播放器，我們認為沒有理由改變這一點。",
-  "Open it in Media Player again": "再次在 Media Player 中開啟"
+  "Open it in Media Player again": "再次在 Media Player 中開啟",
+  "28.8k (allegedly)": "28.8k（據說）",
+  "as seen from 1998 — text in the browser, moving pictures in Media Player 98":
+    "1998 年視角 — 文字在瀏覽器裡，會動的畫面在 Media Player 98 裡",
+  "The modern ": "現代的 ", " front page is an empty shell until you search, so search:":
+    " 首頁在您搜尋之前只是個空殼，所以搜吧:",
+  "Search ": "搜尋 ", "Search": "搜尋",
+  "Results arrive as good honest text. Click any video and it plays in Media Player 98.":
+    "結果以誠實的純文字送達。點任何影片，就會在 Media Player 98 中播放。"
 };

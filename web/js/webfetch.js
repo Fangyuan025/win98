@@ -79,8 +79,17 @@ W98.WebFetch = (() => {
     const title = (doc.querySelector("title") && doc.querySelector("title").textContent.trim()) || baseUrl;
     /* strip obvious non-content regions before extracting */
     doc.querySelectorAll("nav, header, footer, aside, [role=navigation], [role=banner], [role=contentinfo], .nav, .navbar, .menu, .sidebar, .footer, .header, #footer, #header, #mw-navigation, #p-lang, .mw-editsection, .navbox, .vector-menu, style, script").forEach(n => n.remove());
-    /* prefer a real article/content region, most specific first */
-    const root = doc.querySelector("#mw-content-text .mw-parser-output, #mw-content-text, .mw-parser-output, .post-content, .entry-content, .article-body, .article__body, [itemprop=articleBody], #search, #rso, #b_results, article, main, [role=main]") || doc.body || doc.documentElement;
+    /* prefer a real article/content region, most specific first — but only if it
+       actually holds content (YouTube has an empty element with id="search") */
+    let root = null;
+    for (const sel of ["#mw-content-text .mw-parser-output", "#mw-content-text", ".mw-parser-output",
+                       ".post-content", ".entry-content", ".article-body", ".article__body",
+                       "[itemprop=articleBody]", "#search", "#rso", "#b_results",
+                       "article", "main", "[role=main]"]) {
+      const cand = doc.querySelector(sel);
+      if (cand && cand.textContent.replace(/\s+/g, "").length > 500) { root = cand; break; }
+    }
+    if (!root) root = doc.body || doc.documentElement;
     /* search pages keep their query form even when we narrow to a content root */
     const headForm = root !== doc.body && doc.querySelector("form[action*='search'], form[role=search]");
 
