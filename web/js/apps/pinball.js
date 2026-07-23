@@ -40,7 +40,7 @@ W98.Apps.pinball = {
 
     /* table geometry: segments [x1,y1,x2,y2] */
     const FL = { px: 100, py: 496, len: 62 };
-    const FR = { px: 220, py: 496, len: 62 };
+    const FR = { px: 240, py: 496, len: 62 };
     const SEGS = [
       [2, 80, 2, H],                       // left wall
       [W - 2, 72, W - 2, LANE_FLOOR],      // right outer wall — lane stays open to the top
@@ -107,9 +107,10 @@ W98.Apps.pinball = {
     }
 
     function flipSeg(f, right, ang) {
+      /* left: hinge at px, blade down-right; right: hinge at px, blade down-LEFT (a true mirror) */
       const base = right ? Math.PI - 0.52 : 0.52;
       const a = right ? base + ang : base - ang;
-      return [f.px, f.py, f.px + Math.cos(a) * f.len * (right ? -1 : 1), f.py + Math.sin(a) * f.len];
+      return [f.px, f.py, f.px + Math.cos(a) * f.len, f.py + Math.sin(a) * f.len];
     }
 
     function collideSeg(sx1, sy1, sx2, sy2, boost) {
