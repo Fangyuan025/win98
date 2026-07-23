@@ -347,5 +347,35 @@ W98.I18N_BODY_ZH = {
   "PDF pages render inside the native app. In the browser preview, the paper stays imaginary.":
     "PDF 頁面在原生應用程式中呈現。在瀏覽器預覽裡，紙張仍是想像的。",
   "Cannot display this document.": "無法顯示這份文件。",
-  "Previous Page": "上一頁", "Next Page": "下一頁", "Zoom In": "放大", "Zoom Out": "縮小"
+  "Previous Page": "上一頁", "Next Page": "下一頁", "Zoom In": "放大", "Zoom Out": "縮小",
+
+  /* ---- era events ---- */
+  "The connection to My ISP was terminated.\n\nSomeone in the house picked up the phone.\nThey say it is important. It is about a casserole.":
+    "與 My ISP 的連線已中斷。\n\n家裡有人拿起了電話。\n他們說很重要。是關於一鍋燉菜的事。",
+  "You are the 1,000,000th visitor to this Web site!\n\nYou have won a FREE* prize!\n\n(* Prize is a valuable lesson about the 1998 internet.)":
+    "您是本網站第 1,000,000 位訪客！\n\n您贏得了免費*大獎！\n\n（* 獎品是關於 1998 年網際網路的寶貴一課。）",
+  "300+ FREE screensavers! Flying toasters! Fish!\nMore fish! A different kind of toaster!\n\nAlso installs 9 toolbars. The toolbars are forever.":
+    "300 多個免費螢幕保護程式！飛行烤麵包機！魚！\n更多魚！另一種烤麵包機！\n\n同時安裝 9 條工具列。工具列是永遠的。",
+  "All the radio hits of 1998, lovingly converted\nto MIDI by someone's cousin!\n\nSounds 40% like the original song!":
+    "1998 年所有電台金曲，由某人的表哥\n深情轉換成 MIDI！\n\n聽起來有 40% 像原曲！",
+  "The server did not respond.\n\nThe prize, like so much of the 1998 internet, was a journey and not a destination.":
+    "伺服器沒有回應。\n\n這份獎品，就像 1998 年網際網路的大多數事物，是一段旅程，而非目的地。",
+  "Your system is running low on virtual memory.\n\nYou have ": "您的系統虛擬記憶體不足。\n\n您開了 ",
+  " windows open. In 1998, this was considered\nshowing off. Please close something.":
+    " 個視窗。在 1998 年，這叫炫耀。\n請關掉一些。",
+  "Unknown Device": "不明的裝置",
+  "Windows has found new hardware and is locating the driver for it.":
+    "Windows 找到了新硬體，正在尋找它的驅動程式。",
+  "(Nothing was plugged in. Windows simply believes.)": "（什麼都沒插。Windows 就是相信。）",
+  "Next >": "下一步 >", "Finish": "完成",
+  "Driver not found": "找不到驅動程式",
+  "Windows could not locate a driver for this device. The device may work anyway, forever, mysteriously.":
+    "Windows 找不到這個裝置的驅動程式。裝置也許照樣能用，永遠地、神祕地。",
+  "Era-accurate random events (blue screens, popup ads, Aunt Carol)":
+    "時代感隨機事件（藍畫面、彈出廣告、Carol 阿姨）",
+  "Windows was not properly shut down. One or more of": "Windows 未正常關機。您的一個或多個",
+  "your drives may have errors on it.": "磁碟機可能有錯誤。",
+  "ScanDisk is now checking drive C for errors:": "ScanDisk 正在檢查磁碟機 C 的錯誤:",
+  "(Next time, use the Start menu to shut down. It remembers.)": "（下次請用開始功能表關機。它都記得。）",
+  "Press any key to skip.": "按任意鍵跳過。"
 };

@@ -962,6 +962,11 @@ W98.Apps.sysprops = {
                 el("div", { text: "  64.0MB RAM", style: "padding-left:10px" })
               ))
           );
+          const cb = el("input", { type: "checkbox" });
+          cb.checked = Store.get("eraEvents", true);
+          cb.addEventListener("change", () => Store.set("eraEvents", cb.checked));
+          page.append(el("label", { style: "display:flex;align-items:center;gap:4px;padding:8px 6px;border-top:1px solid #808080;margin-top:6px" },
+            cb, el("span", { text: "Era-accurate random events (blue screens, popup ads, Aunt Carol)" })));
         }
       },
       {

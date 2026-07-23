@@ -136,7 +136,8 @@ const Boot = W98.Boot = (() => {
         W98.bus.emit("booted");
       });
     }
-    return bootScreen().then(() => loginDialog()).then(() => {
+    const dirty = Store.get("cleanShutdown", true) === false;
+    return bootScreen().then(() => dirty ? scandiskScreen() : null).then(() => loginDialog()).then(() => {
       Sound.play("startup");
       W98.bus.emit("booted");
     });
@@ -250,7 +251,47 @@ const Boot = W98.Boot = (() => {
     setTimeout(thenFn, 2000);
   }
 
+  /* blue ScanDisk screen after an improper shutdown — 1998 kept receipts */
+  function scandiskScreen() {
+    return new Promise((resolve) => {
+      const boot = $("#boot");
+      boot.innerHTML = "";
+      boot.classList.remove("hidden");
+      const bar = el("div", { style: "height:14px;border:1px solid #fff;margin-top:14px;position:relative" });
+      const fill = el("div", { style: "position:absolute;left:0;top:0;bottom:0;width:0%;background:#ffff55" });
+      bar.append(fill);
+      const scr = el("div", { style: "position:absolute;inset:0;background:#0000aa;color:#c0c0c0;font-family:'Courier New',monospace;font-size:14px;display:flex;align-items:center;justify-content:center" },
+        el("div", { style: "width:480px;line-height:1.6" },
+          el("div", { style: "text-align:center;margin-bottom:10px" }, el("span", { style: "background:#c0c0c0;color:#0000aa;padding:0 8px", text: "Microsoft ScanDisk" })),
+          el("div", { text: "Windows was not properly shut down. One or more of" }),
+          el("div", { text: "your drives may have errors on it." }),
+          el("div", { text: "ScanDisk is now checking drive C for errors:", style: "margin-top:10px" }),
+          bar,
+          el("div", { style: "font-size:12px;color:#8888cc;margin-top:14px", text: "(Next time, use the Start menu to shut down. It remembers.)" }),
+          el("div", { style: "font-size:12px;margin-top:4px", text: "Press any key to skip." })));
+      boot.append(scr);
+      let p = 0;
+      const t = setInterval(() => {
+        p = Math.min(100, p + 1.6 + Math.random() * 2.4);
+        fill.style.width = p + "%";
+        if (p >= 100) { finish(); }
+      }, 90);
+      let done = false;
+      function finish() {
+        if (done) return;
+        done = true;
+        clearInterval(t);
+        document.removeEventListener("keydown", finish, true);
+        scr.remove();
+        resolve();
+      }
+      document.addEventListener("keydown", finish, { capture: true });
+    });
+  }
+
   function shutdown() {
+    Store.set("cleanShutdown", true);
+    Store.saveNow && Store.saveNow();
     shutdownScreen("Windows is shutting down", () => {
       if (Store.native({ cmd: "quit" })) return;
       const boot = $("#boot");
@@ -263,6 +304,8 @@ const Boot = W98.Boot = (() => {
   }
 
   function restart() {
+    Store.set("cleanShutdown", true);
+    Store.saveNow && Store.saveNow();
     shutdownScreen("Windows is restarting", () => location.reload());
   }
 

@@ -184,6 +184,9 @@
     Taskbar.init();
     W98.Screensaver && W98.Screensaver.init();
     W98.DisplayMode && W98.DisplayMode.apply();
+    /* running = not yet cleanly shut down; the Start menu path clears this */
+    setTimeout(() => Store.set("cleanShutdown", false), 5000);
+    W98.Events && W98.Events.init();
     /* these programs need the internet; opening them offline triggers the dial-up prompt */
     ["pal", "chatterbox", "netgrab", "surreal", "netmeet"].forEach((id) => {
       const app = W98.Apps[id];

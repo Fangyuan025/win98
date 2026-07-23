@@ -133,6 +133,10 @@ W98.HelpTopics = {
       <li>Control Panel → Printers (or double-click the tray printer) opens the queue:
         pause printing, purge jobs, or double-click a job to cancel it.</li>
       <li>Never choose "The Office Printer". It is always jammed. This is documented behavior.</li>
+      <li><b>The machine is alive</b> — rarely, and only after you have settled in, 1998 happens:
+        a chain letter arrives, a popup ad interrupts, someone picks up the phone during a download,
+        Windows finds hardware that does not exist, and once in a long while — the blue screen
+        (press any key; nothing is lost). Turn it all off in System Properties if your nerves prefer 2026.</li>
     </ul>`],
 
   addremove: ["Add/Remove Programs & Windows Update", `
