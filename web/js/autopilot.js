@@ -121,9 +121,46 @@ W98.Autopilot = (() => {
   /* find a window by title fragment */
   const winBy = (frag) => WM.wins.find(w => !w.closed && w.title.indexOf(frag) >= 0);
 
-  /* launch an app the human way: through the Start menu when possible */
-  async function ghostLaunch(appId, progLabel) {
+  /* names as they appear on desktop icons */
+  const DESKTOP_NAMES = { ie: "Internet Explorer", mail: "Internet Mail", claude98: "Claude Desktop 98",
+    minesweeper: "Minesweeper", paint: "Paint", notepad: "Notepad", calc: "Calculator", megaamp: "MegaAmp" };
+
+  /* an app that is already open gets focused, not re-launched — no window plagues */
+  async function focusExisting(appId, titleFrag) {
+    const w = WM.wins.find(x => !x.closed && !x.opts.noTaskbar &&
+      ((x.opts.appId && x.opts.appId === appId) || (titleFrag && x.title.indexOf(titleFrag) >= 0)));
+    if (!w) return null;
+    const btn = [...document.querySelectorAll("#taskbar button")]
+      .find(b => b.textContent.trim().length > 2 && w.title.indexOf(b.textContent.trim().replace(/\.\.\.$/, "").slice(0, 10)) >= 0);
+    if (btn) await clickEl(btn);
+    else await clickEl(w.el.querySelector(".titlebar") || w.el, "down");
+    await sleep(rnd(300, 600));
+    if (w.minimized && w.restore) w.restore();
+    return w;
+  }
+
+  /* launch an app the human way: desktop icon, Start menu, or just find it again */
+  async function ghostLaunch(appId, progLabel, titleFrag) {
     check();
+    const existing = await focusExisting(appId, titleFrag);
+    if (existing) return existing;
+
+    /* route 1: double-click the desktop icon, if there is one */
+    const name = DESKTOP_NAMES[appId];
+    if (name && Math.random() < 0.5) {
+      const ic = [...document.querySelectorAll("#desktop > div")]
+        .find(d => d.textContent.trim().startsWith(name.slice(0, 12)));
+      if (ic) {
+        await clickEl(ic, "down");
+        await sleep(rnd(180, 380));
+        const p = screenPoint(ic);
+        ic.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: p.x, clientY: p.y, button: 0 }));
+        await sleep(rnd(700, 1200));
+        return WM.wins[WM.wins.length - 1];
+      }
+    }
+
+    /* route 2: the Start menu crawl */
     const startBtn = $("#start-btn");
     await clickEl(startBtn, "click");
     await sleep(rnd(350, 700));
@@ -200,7 +237,7 @@ W98.Autopilot = (() => {
   ];
 
   async function actDiary() {
-    const win = await ghostLaunch("notepad", "Notepad");
+    const win = await ghostLaunch("notepad", "Notepad", "Notepad");
     const w = winBy("Notepad") || win;
     if (!w) return;
     const ta = w.el.querySelector("textarea");
@@ -213,7 +250,7 @@ W98.Autopilot = (() => {
   }
 
   async function actMinesweeper() {
-    await ghostLaunch("minesweeper", "Minesweeper");
+    await ghostLaunch("minesweeper", "Minesweeper", "Minesweeper");
     const w = winBy("Minesweeper") || winBy("踩地雷");
     if (!w) return;
     const myFlags = new Set();
@@ -327,7 +364,7 @@ W98.Autopilot = (() => {
   }
 
   async function actBrowse() {
-    await ghostLaunch("ie", "Internet Explorer");
+    await ghostLaunch("ie", "Internet Explorer", "Internet Explorer");
     await sleep(800);
     await handleDialPrompt();
     const w = WM.wins.find(x => !x.closed && /Internet Explorer/.test(x.title));
@@ -352,7 +389,7 @@ W98.Autopilot = (() => {
   }
 
   async function actMail() {
-    await ghostLaunch("mail", "Internet Mail");
+    await ghostLaunch("mail", "Internet Mail", "Internet Mail");
     const w = winBy("Internet Mail");
     if (!w) return;
     const rows = [...w.el.querySelectorAll("[class*=row], tbody tr, .list > div")].slice(0, 6);
@@ -366,7 +403,7 @@ W98.Autopilot = (() => {
   }
 
   async function actClaude() {
-    await ghostLaunch("claude98", null);
+    await ghostLaunch("claude98", null, "Claude");
     const w = winBy("Claude");
     if (!w) return;
     const inp = w.el.querySelector("textarea.field");
@@ -384,7 +421,7 @@ W98.Autopilot = (() => {
   }
 
   async function actPaint() {
-    await ghostLaunch("paint", "Paint");
+    await ghostLaunch("paint", "Paint", "Paint");
     const w = winBy("Paint") || winBy("小畫家");
     if (!w) return;
     const cv = w.el.querySelector("canvas");
@@ -413,7 +450,7 @@ W98.Autopilot = (() => {
   }
 
   async function actMusic() {
-    await ghostLaunch("megaamp", null);
+    await ghostLaunch("megaamp", null, "MegaAmp");
     await sleep(rnd(1500, 2500));
     const w = winBy("MegaAmp");
     if (!w) return;
@@ -421,6 +458,62 @@ W98.Autopilot = (() => {
     if (play) await clickEl(play);
     /* bob it along for a while */
     for (let i = 0; i < 5; i++) { check(); await sleep(rnd(2500, 4500)); }
+  }
+
+  async function actCalc() {
+    const w = await ghostLaunch("calc", "Calculator", "Calculator");
+    if (!w || w.closed) return;
+    const press = async (t) => {
+      const b = [...w.el.querySelectorAll("button")].find(x => x.textContent.trim() === t);
+      if (b) { await clickEl(b); await sleep(rnd(120, 320)); }
+    };
+    const a = 12 + ((Math.random() * 88) | 0), b2 = 3 + ((Math.random() * 9) | 0);
+    for (const d of String(a)) await press(d);
+    await press("*");
+    for (const d of String(b2)) await press(d);
+    await press("=");
+    await sleep(rnd(1500, 3000));   /* admire the result, mouth the number */
+    await maybeClose(w);
+  }
+
+  async function actDos() {
+    const w = await ghostLaunch("dos", "MS-DOS Prompt", "MS-DOS");
+    if (!w || w.closed) return;
+    const ta = w.el.querySelector("textarea");
+    if (!ta) { await maybeClose(w, 1); return; }
+    await clickEl(ta);
+    const cmds = pick([["ver", "dir", "mem"], ["dir", "ping dave-pc"], ["vol", "dir /w", "cls", "ver"]]);
+    for (const cmd of cmds) {
+      check();
+      for (const ch of cmd) {
+        ta.value += ch;
+        ta.dispatchEvent(new Event("input", { bubbles: true }));
+        await sleep(rnd(50, 140));
+      }
+      await sleep(rnd(200, 500));
+      ta.value += "\n";
+      ta.dispatchEvent(new Event("input", { bubbles: true }));
+      await sleep(rnd(1500, 3200));   /* read the output like it matters */
+    }
+    await maybeClose(w, 0.8);
+  }
+
+  async function actEncarta() {
+    const w = await ghostLaunch("encarta", null, "Encyclopedia");
+    if (!w || w.closed) return;
+    await sleep(600);
+    const rows = [...w.el.querySelectorAll(".tree > div")].filter(d => d.style.fontWeight !== "700" && d.textContent.trim().length > 2);
+    for (let i = 0; i < 2 && rows.length; i++) {
+      check();
+      await clickEl(pick(rows));
+      await sleep(rnd(800, 1400));
+      const body = [...w.el.querySelectorAll("div")].find(d => d.scrollHeight > d.clientHeight + 40);
+      for (let sc = 0; sc < 3 && body; sc++) {
+        await sleep(rnd(1800, 3200));
+        body.scrollTop += rnd(80, 220);
+      }
+    }
+    await maybeClose(w);
   }
 
   async function actIdle() {
@@ -451,8 +544,11 @@ W98.Autopilot = (() => {
     { id: "mail", w: 2, run: actMail },
     { id: "claude", w: 2, run: actClaude },
     { id: "paint", w: 2, run: actPaint },
+    { id: "calc", w: 2, run: actCalc },
+    { id: "dos", w: 2, run: actDos },
+    { id: "encarta", w: 2, run: actEncarta },
     { id: "music", w: 1, run: actMusic },
-    { id: "idle", w: 2, run: actIdle },
+    { id: "idle", w: 1, run: actIdle },
     { id: "shuffle", w: 1, run: actWindowShuffle }
   ];
 
