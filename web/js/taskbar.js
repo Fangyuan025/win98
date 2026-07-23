@@ -111,6 +111,7 @@ const Taskbar = W98.Taskbar = (() => {
       : [{ label: "(Empty — add pages in Internet Explorer)", disabled: true }];
     return [
       { label: "Windows Update", icon: "ie", click: () => W98.launch("ie", "http://update.web98.net/") },
+      { label: "Autopilot 98", icon: "claude98", click: () => W98.Autopilot.confirmStart() },
       "-",
       { label: "Programs", icon: "programs", sub: progItems },
       { label: "Favorites", icon: "favorites", sub: favItems },
