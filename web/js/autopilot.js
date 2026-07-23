@@ -16,7 +16,8 @@ W98.Autopilot = (() => {
   const pick = (arr) => arr[(Math.random() * arr.length) | 0];
 
   /* ---------- abort-aware primitives ---------- */
-  function check() { if (!active) throw STOP; }
+  let abortAct = false;   /* watchdog trips this to kill a hung activity */
+  function check() { if (!active || abortAct) throw STOP; }
   let turbo = false;   /* test mode: compress the waits, keep the logic */
   /* worker-driven timing: page timers are throttled to 1s+ when the window is
      hidden, but worker timers are not — BOB keeps working while minimized */
@@ -38,7 +39,7 @@ W98.Autopilot = (() => {
     if (turbo) ms = Math.max(1, ms / 15);
     return new Promise((res, rej) => {
       if (!active) { rej(STOP); return; }
-      const done = () => active ? res() : rej(STOP);
+      const done = () => (active && !abortAct) ? res() : rej(STOP);
       if (sleepWorker) {
         const id = ++sleepSeq;
         sleepCbs.set(id, done);
@@ -151,7 +152,8 @@ W98.Autopilot = (() => {
 
   /* names as they appear on desktop icons */
   const DESKTOP_NAMES = { ie: "Internet Explorer", mail: "Internet Mail", claude98: "Claude Desktop 98",
-    minesweeper: "Minesweeper", paint: "Paint", notepad: "Notepad", calc: "Calculator", megaamp: "MegaAmp" };
+    minesweeper: "Minesweeper", paint: "Paint", notepad: "Notepad", calc: "Calculator", megaamp: "MegaAmp",
+    pinball: "Star Pilot Pinball", wordpad: "Word", encarta: "Encyclopedia 98" };
 
   /* an app that is already open gets focused, not re-launched — no window plagues */
   async function focusExisting(appId, titleFrag) {
@@ -181,7 +183,7 @@ W98.Autopilot = (() => {
     /* route 1: double-click the desktop icon, if there is one */
     const name = DESKTOP_NAMES[appId];
     if (name && Math.random() < 0.5) {
-      const ic = [...document.querySelectorAll("#desktop > div")]
+      const ic = [...document.querySelectorAll("#desktop .dicon")]
         .find(d => d.textContent.trim().startsWith(name.slice(0, 12)));
       if (ic) {
         const before = WM.wins.filter(x => !x.closed).length;
@@ -459,47 +461,111 @@ W98.Autopilot = (() => {
     await maybeClose(w, 0.7);
   }
 
+  /* BOB's gallery: recognizable pictures, one confident stroke at a time.
+     Coordinates are normalized 0..1 over the canvas. */
+  const PICTURES = [
+    { name: "house", strokes: [
+      { c: "#804000", pts: [[0.25, 0.85], [0.25, 0.5], [0.75, 0.5], [0.75, 0.85], [0.25, 0.85]] },
+      { c: "#c00000", pts: [[0.2, 0.5], [0.5, 0.22], [0.8, 0.5]] },
+      { c: "#804000", pts: [[0.45, 0.85], [0.45, 0.66], [0.55, 0.66], [0.55, 0.85]] },
+      { c: "#00c0c0", pts: [[0.3, 0.58], [0.4, 0.58], [0.4, 0.68], [0.3, 0.68], [0.3, 0.58]] },
+      { c: "#808080", pts: [[0.62, 0.32], [0.62, 0.2], [0.68, 0.2], [0.68, 0.38]] }
+    ]},
+    { name: "sun+boat", strokes: [
+      { c: "#0000c0", pts: [[0.05, 0.7], [0.2, 0.66], [0.35, 0.72], [0.5, 0.66], [0.65, 0.72], [0.8, 0.66], [0.95, 0.7]] },
+      { c: "#804000", pts: [[0.35, 0.7], [0.4, 0.8], [0.6, 0.8], [0.65, 0.7], [0.35, 0.7]] },
+      { c: "#ffffff", pts: [[0.5, 0.7], [0.5, 0.4], [0.62, 0.55], [0.5, 0.58]] },
+      { c: "#ffff00", pts: [[0.82, 0.18], [0.86, 0.14], [0.9, 0.14], [0.93, 0.18], [0.93, 0.24], [0.9, 0.28], [0.85, 0.28], [0.82, 0.24], [0.82, 0.18]] },
+      { c: "#ffff00", pts: [[0.87, 0.06], [0.87, 0.1]] },
+      { c: "#ffff00", pts: [[0.75, 0.2], [0.79, 0.2]] },
+      { c: "#ffff00", pts: [[0.96, 0.2], [1.0, 0.2]] }
+    ]},
+    { name: "smiley", strokes: [
+      { c: "#000000", pts: [[0.5, 0.2], [0.62, 0.23], [0.72, 0.32], [0.76, 0.45], [0.72, 0.58], [0.62, 0.67], [0.5, 0.7], [0.38, 0.67], [0.28, 0.58], [0.24, 0.45], [0.28, 0.32], [0.38, 0.23], [0.5, 0.2]] },
+      { c: "#000000", pts: [[0.42, 0.38], [0.42, 0.44]] },
+      { c: "#000000", pts: [[0.58, 0.38], [0.58, 0.44]] },
+      { c: "#c00000", pts: [[0.38, 0.55], [0.45, 0.61], [0.55, 0.61], [0.62, 0.55]] }
+    ]},
+    { name: "flower", strokes: [
+      { c: "#00c000", pts: [[0.5, 0.9], [0.5, 0.55]] },
+      { c: "#00c000", pts: [[0.5, 0.75], [0.38, 0.68]] },
+      { c: "#c000c0", pts: [[0.5, 0.42], [0.44, 0.34], [0.5, 0.27], [0.56, 0.34], [0.5, 0.42]] },
+      { c: "#c000c0", pts: [[0.5, 0.42], [0.4, 0.44], [0.38, 0.36], [0.45, 0.33]] },
+      { c: "#c000c0", pts: [[0.5, 0.42], [0.6, 0.44], [0.62, 0.36], [0.55, 0.33]] },
+      { c: "#ffff00", pts: [[0.48, 0.37], [0.52, 0.37], [0.52, 0.4], [0.48, 0.4], [0.48, 0.37]] }
+    ]}
+  ];
+
   async function actPaint() {
-    await ghostLaunch("paint", "Paint", "Paint");
-    const w = winBy("Paint") || winBy("小畫家");
-    if (!w) return;
+    const w = await ghostLaunch("paint", "Paint", "Paint");
+    if (!w || w.closed) return;
     const cv = w.el.querySelector("canvas");
     if (!cv) return;
-    const r = cv.getBoundingClientRect();
-    for (let stroke = 0; stroke < 3; stroke++) {
+    const pic = pick(PICTURES);
+    const sp = () => $("#screen").getBoundingClientRect();
+    for (const stroke of pic.strokes) {
       check();
-      let px = r.left + rnd(30, r.width - 60), py = r.top + rnd(30, r.height - 60);
-      const sp = $("#screen").getBoundingClientRect();
-      await moveTo(px - sp.left, py - sp.top);
-      cv.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, clientX: px, clientY: py }));
-      for (let i = 0; i < 22; i++) {
+      /* choose the color like a person: click the palette chip */
+      const chip = [...w.el.querySelectorAll(".pc")].find(b => {
+        const bg = b.style.background || b.style.backgroundColor;
+        return bg && bg.replace(/\s/g, "") === hexToRgb(stroke.c);
+      });
+      if (chip) { await clickEl(chip, "down"); await sleep(rnd(150, 350)); }
+      const r = cv.getBoundingClientRect();
+      const px = (t) => r.left + (0.08 + t * 0.84) * r.width;
+      const py = (t) => r.top + (0.05 + t * 0.9) * r.height;
+      const pts = stroke.pts;
+      let sx = px(pts[0][0]), sy = py(pts[0][1]);
+      await moveTo(sx - sp().left, sy - sp().top);
+      cv.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, clientX: sx, clientY: sy, button: 0 }));
+      for (let i = 1; i < pts.length; i++) {
         check();
-        px += rnd(-4, 18); py += Math.sin(i / 3) * 9 + rnd(-3, 3);
-        cv.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, clientX: px, clientY: py }));
-        cursorEl.style.left = (px - sp.left) + "px";
-        cursorEl.style.top = (py - sp.top) + "px";
-        cx = px - sp.left; cy = py - sp.top;
-        await sleep(28);
+        const ex = px(pts[i][0]), ey = py(pts[i][1]);
+        const segs = Math.max(3, Math.round(Math.hypot(ex - sx, ey - sy) / 9));
+        for (let k = 1; k <= segs; k++) {
+          const ix = sx + (ex - sx) * k / segs + rnd(-0.6, 0.6);
+          const iy = sy + (ey - sy) * k / segs + rnd(-0.6, 0.6);
+          cv.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, clientX: ix, clientY: iy }));
+          cursorEl.style.left = (ix - sp().left) + "px";
+          cursorEl.style.top = (iy - sp().top) + "px";
+          cx = ix - sp().left; cy = iy - sp().top;
+          await sleep(16);
+        }
+        sx = ex; sy = ey;
       }
-      cv.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, clientX: px, clientY: py }));
-      await sleep(rnd(500, 1200));
+      cv.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, clientX: sx, clientY: sy, button: 0 }));
+      await sleep(rnd(300, 800));
     }
-    await sleep(rnd(900, 1600));
-    await maybeClose(w, 0.8);
+    await sleep(rnd(1500, 2800));   /* step back and admire it */
+    await maybeClose(w, 0.7);
+  }
+  function hexToRgb(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    return "rgb(" + (n >> 16) + "," + ((n >> 8) & 255) + "," + (n & 255) + ")";
   }
 
-  async function actMusic() {
-    await ghostLaunch("megaamp", null, "MegaAmp");
-    await sleep(rnd(1500, 2500));
-    const w = winBy("MegaAmp");
-    if (!w) return;
-    const play = [...w.el.querySelectorAll("button")].find(b => /▶|Play/.test(b.textContent));
+    async function actMusic() {
+    const w = await ghostLaunch("megaamp", null, "MegaAmp");
+    if (!w || w.closed) return;
+    await sleep(rnd(800, 1500));
+    const btn = (t) => [...w.el.querySelectorAll("button")].find(b => b.textContent.trim() === t);
+    const play = btn("▶");
     if (play) await clickEl(play);
-    /* bob it along for a while */
-    for (let i = 0; i < 5; i++) { check(); await sleep(rnd(2500, 4500)); }
+    /* enjoy 2 short listens, maybe skip a track like a restless person */
+    for (let i = 0; i < 2; i++) {
+      check();
+      await sleep(rnd(5000, 9000));
+      const next = btn("⏭") || btn(">>");
+      if (next && Math.random() < 0.5) { await clickEl(next); }
+    }
+    await sleep(rnd(3000, 6000));
+    const stop = btn("■");
+    if (stop) await clickEl(stop);      /* BOB turns the music OFF */
+    await sleep(rnd(400, 900));
+    await maybeClose(w, 0.9);
   }
 
-  async function actCalc() {
+    async function actCalc() {
     const w = await ghostLaunch("calc", "Calculator", "Calculator");
     if (!w || w.closed) return;
     const press = async (t) => {
@@ -555,6 +621,90 @@ W98.Autopilot = (() => {
     await maybeClose(w);
   }
 
+  /* poke around the desktop like a bored person */
+  async function actDesktop() {
+    const SAFE = ["cool sites.txt", "My Resume.doc", "Encyclopedia 98", "My Computer"];
+    const icons = [...document.querySelectorAll("#desktop .dicon")]
+      .filter(d => SAFE.some(n => d.textContent.trim().startsWith(n.slice(0, 10))));
+    if (!icons.length) return actIdle();
+    const ic = pick(icons);
+    await clickEl(ic, "down");
+    await sleep(rnd(300, 700));
+    const before = WM.wins.filter(x => !x.closed).length;
+    const p = screenPoint(ic);
+    ic.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: p.x, clientY: p.y, button: 0 }));
+    for (let i = 0; i < 8; i++) {
+      await sleep(300);
+      if (WM.wins.filter(x => !x.closed).length > before) break;
+    }
+    const w = WM.wins[WM.wins.length - 1];
+    await sleep(rnd(2500, 5000));    /* read whatever opened */
+    if (w && !w.closed && !w.opts.noTaskbar) await maybeClose(w, 0.8);
+  }
+
+  async function actPinball() {
+    const w = await ghostLaunch("pinball", "Star Pilot Pinball", "Pinball");
+    if (!w || w.closed) return;
+    await sleep(rnd(600, 1100));
+    /* pull the plunger: hold SPACE, release */
+    w.el.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
+    await sleep(rnd(700, 1000));
+    w.el.dispatchEvent(new KeyboardEvent("keyup", { key: " ", bubbles: true }));
+    /* flip at the ball now and then, like it helps */
+    for (let i = 0; i < 5; i++) {
+      check();
+      await sleep(rnd(1200, 2500));
+      const k = Math.random() < 0.5 ? "z" : "/";
+      w.el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true }));
+      await sleep(rnd(120, 260));
+      w.el.dispatchEvent(new KeyboardEvent("keyup", { key: k, bubbles: true }));
+    }
+    await sleep(rnd(1000, 2000));
+    await maybeClose(w, 0.8);
+  }
+
+  async function actExplorer() {
+    const w = await ghostLaunch("explorer", "Windows Explorer", "Exploring");
+    if (!w || w.closed) return;
+    await sleep(rnd(700, 1200));
+    const items = [...w.el.querySelectorAll(".lv-bigitem")];
+    if (items.length) {
+      const it = pick(items);
+      await clickEl(it, "down");          /* select something, consider it */
+      await sleep(rnd(1200, 2400));
+      const docs = items.find(d => /My Documents/.test(d.textContent));
+      if (docs) {
+        const p = screenPoint(docs);
+        await moveTo(p.x, p.y);
+        docs.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: p.x, clientY: p.y, button: 0 }));
+        await sleep(rnd(1500, 2600));
+      }
+    }
+    await sleep(rnd(1500, 3000));
+    await maybeClose(w);
+  }
+
+  const LETTERS = [
+    "Dear PenPal,\n\nHow is the weather in your country? Here it is\nmostly modem sounds. I am learning HTML.\n\nYours,\nBOB",
+    "To whom it may concern,\n\nI am writing to formally request more RAM.\nMy computer has 64 MB and my dreams have more.\n\nSincerely,\nBOB"
+  ];
+  async function actWordpad() {
+    const w = await ghostLaunch("wordpad", "WordPad", "WordPad");
+    if (!w || w.closed) return;
+    const ed = w.el.querySelector(".wp-editor");
+    if (!ed) { await maybeClose(w, 1); return; }
+    await clickEl(ed);
+    const text = pick(LETTERS);
+    for (const ch of text) {
+      check();
+      ed.innerText = ed.innerText.replace(/\n$/, "") + ch;
+      ed.dispatchEvent(new Event("input", { bubbles: true }));
+      await sleep(ch === "\n" ? rnd(280, 600) : rnd(45, 140));
+    }
+    await sleep(rnd(1500, 2800));
+    await maybeClose(w, 0.9);
+  }
+
   async function actIdle() {
     /* coffee. staring. the 1998 default state. */
     for (let i = 0; i < 4; i++) {
@@ -580,12 +730,16 @@ W98.Autopilot = (() => {
     { id: "diary", w: 3, run: actDiary },
     { id: "mine", w: 3, run: actMinesweeper },
     { id: "browse", w: 3, run: actBrowse },
+    { id: "paint", w: 3, run: actPaint },
     { id: "mail", w: 2, run: actMail },
     { id: "claude", w: 2, run: actClaude },
-    { id: "paint", w: 2, run: actPaint },
     { id: "calc", w: 2, run: actCalc },
     { id: "dos", w: 2, run: actDos },
     { id: "encarta", w: 2, run: actEncarta },
+    { id: "desktop", w: 2, run: actDesktop },
+    { id: "pinball", w: 2, run: actPinball },
+    { id: "explorer", w: 1, run: actExplorer },
+    { id: "wordpad", w: 2, run: actWordpad },
     { id: "music", w: 1, run: actMusic },
     { id: "idle", w: 1, run: actIdle },
     { id: "shuffle", w: 1, run: actWindowShuffle }
@@ -615,8 +769,18 @@ W98.Autopilot = (() => {
         let r = Math.random() * total;
         const act = pool.find(a => (r -= a.w) <= 0) || pool[0];
         lastActivity = act.id;
-        try { await act.run(); } catch (e) { if (e === STOP) throw e; }
-        check();
+        abortAct = false;
+        trace("act " + act.id);
+        /* watchdog: an activity gets 100s, then BOB shrugs and moves on */
+        let watchdogTimer = null;
+        const guarded = Promise.race([
+          act.run().catch(e => { if (e !== STOP || active) return; throw e; }),
+          new Promise((res) => { watchdogTimer = setTimeout(() => { abortAct = true; trace("watchdog " + act.id); res(); }, turbo ? 15000 : 100000); })
+        ]);
+        try { await guarded; } catch (e) { if (e === STOP && !active) throw e; }
+        clearTimeout(watchdogTimer);
+        abortAct = false;
+        if (!active) throw STOP;
         /* between tasks: maybe tidy one window, always pause like a person */
         {
           const open = WM.wins.filter(w => !w.closed && !w.opts.noTaskbar);
@@ -691,6 +855,30 @@ W98.Autopilot = (() => {
 
   return { start, stop, confirmStart, get active() { return active; }, _trace: TRACE,
     _act: (id) => { const a = ACTIVITIES.find(x => x.id === id); return a && a.run(); },
+    /* marathon test: n random activities through the real loop machinery */
+    _marathon: async (n, fast) => {
+      if (active) return "already active";
+      active = true; turbo = !!fast; cx = 400; cy = 300;
+      makeCursor();
+      const done = [];
+      try {
+        for (let i = 0; i < n && active; i++) {
+          const pool = ACTIVITIES.filter(a => a.id !== lastActivity && a.id !== "idle");
+          const act = pool[(Math.random() * pool.length) | 0];
+          lastActivity = act.id;
+          abortAct = false;
+          let wd = null;
+          await Promise.race([
+            act.run().catch(e => { if (e !== STOP) trace("err " + act.id + ": " + e.message); }),
+            new Promise(res => { wd = setTimeout(() => { abortAct = true; trace("watchdog " + act.id); res(); }, 20000); })
+          ]);
+          clearTimeout(wd);
+          abortAct = false;
+          done.push(act.id);
+        }
+      } finally { turbo = false; stop(false); }
+      return done;
+    },
     /* run one activity in isolation (testing) — no main loop competing for the hand */
     _solo: async (id, fast) => {
       if (active) return "already active";
