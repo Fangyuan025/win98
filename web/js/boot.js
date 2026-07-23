@@ -283,6 +283,7 @@ const Boot = W98.Boot = (() => {
         clearInterval(t);
         document.removeEventListener("keydown", finish, true);
         scr.remove();
+        boot.classList.add("hidden");   /* hand the screen back to the logon flow */
         resolve();
       }
       document.addEventListener("keydown", finish, { capture: true });
