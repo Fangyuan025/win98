@@ -101,6 +101,23 @@ W98.Autopilot = (() => {
     }
   }
 
+  /* close a window like a person: aim for the X, decline to save */
+  async function closeWin(w) {
+    if (!w || w.closed) return;
+    const btns = [...w.el.querySelectorAll(".t-btn")];
+    const x = btns[btns.length - 1];
+    if (x) await clickEl(x); else w.close();
+    await sleep(450);
+    const box = WM.wins.find(b => !b.closed && b.opts.noTaskbar && /save|儲存/i.test(b.el.textContent));
+    if (box) {
+      const no = [...box.el.querySelectorAll("button")].find(b => /^(No|否)$/.test(b.textContent.trim()));
+      if (no) await clickEl(no); else box.close(true);
+    }
+  }
+  async function maybeClose(w, p) {
+    if (w && !w.closed && Math.random() < (p == null ? 0.85 : p)) await closeWin(w);
+  }
+
   /* find a window by title fragment */
   const winBy = (frag) => WM.wins.find(w => !w.closed && w.title.indexOf(frag) >= 0);
 
@@ -192,34 +209,121 @@ W98.Autopilot = (() => {
     await typeInto(ta, pick(DIARY));
     await sleep(rnd(1200, 2600));
     /* sometimes close it and refuse to save — a very 1998 relationship with data */
-    if (Math.random() < 0.5) {
-      const closeBtn = w.el.querySelector(".t-btn.close") || w.el.querySelector("[data-tip=Close]");
-      if (closeBtn) await clickEl(closeBtn); else w.close();
-      await sleep(600);
-      const box = WM.wins.find(x => !x.closed && x.opts.noTaskbar && /save|儲存/i.test(x.el.textContent));
-      if (box) {
-        const no = [...box.el.querySelectorAll("button")].find(b => /^(No|否)$/.test(b.textContent.trim()));
-        if (no) await clickEl(no);
-      }
-    }
+    await maybeClose(w, 0.9);
   }
 
   async function actMinesweeper() {
     await ghostLaunch("minesweeper", "Minesweeper");
     const w = winBy("Minesweeper") || winBy("踩地雷");
     if (!w) return;
-    for (let i = 0; i < 7; i++) {
-      check();
-      const cells = [...w.el.querySelectorAll(".mcell.hid")];
-      if (!cells.length) break;
-      await clickEl(pick(cells));
-      await sleep(rnd(500, 1400));
-      if (/💀|😵/.test(w.el.textContent) || w.el.querySelector(".mcell.boom")) {
-        await sleep(rnd(900, 1600));   /* the moment of reflection */
-        break;
+    const myFlags = new Set();
+
+    const read = () => {
+      const cells = {};
+      let maxX = 0, maxY = 0;
+      for (const c of w.el.querySelectorAll(".mcell")) {
+        const x = +c.dataset.x, y = +c.dataset.y;
+        maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
+        cells[x + "," + y] = {
+          el: c, x, y,
+          open: c.classList.contains("open"),
+          n: parseInt(c.textContent, 10) || 0,
+          hid: c.classList.contains("hid"),
+          flag: myFlags.has(x + "," + y),
+          boom: c.style.backgroundColor === "rgb(255, 0, 0)"
+        };
       }
+      return { cells, maxX, maxY };
+    };
+    const neigh = (b, c) => {
+      const out = [];
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        if (!dx && !dy) continue;
+        const k = (c.x + dx) + "," + (c.y + dy);
+        if (b.cells[k]) out.push(b.cells[k]);
+      }
+      return out;
+    };
+    async function flagCell(c) {
+      const p = screenPoint(c.el);
+      await moveTo(p.x, p.y);
+      await sleep(rnd(120, 300));
+      c.el.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: p.x, clientY: p.y }));
+      myFlags.add(c.x + "," + c.y);
     }
-    await sleep(rnd(800, 1500));
+
+    let games = 0;
+    while (games < 2) {
+      check();
+      let b = read();
+      const anyOpen = Object.values(b.cells).some(c => c.open);
+      if (!anyOpen) {   /* opening move: somewhere near the middle */
+        const mid = Object.values(b.cells).filter(c => c.hid &&
+          Math.abs(c.x - b.maxX / 2) < 3 && Math.abs(c.y - b.maxY / 2) < 3);
+        await clickEl(pick(mid.length ? mid : Object.values(b.cells).filter(c => c.hid)));
+        await sleep(rnd(400, 800));
+      }
+      let moves = 0, stuckRandoms = 0;
+      while (moves++ < 45) {
+        check();
+        b = read();
+        if (Object.values(b.cells).some(c => c.boom)) break;           /* lost */
+        const hidden = Object.values(b.cells).filter(c => c.hid && !c.flag);
+        if (!hidden.length) break;                                     /* won */
+
+        /* deduce: numbers whose flags are satisfied → neighbors are safe;
+           numbers whose hidden count equals remaining mines → all mines */
+        let did = false;
+        for (const c of Object.values(b.cells)) {
+          if (!c.open || !c.n) continue;
+          const around = neigh(b, c);
+          const flags = around.filter(a => a.flag).length;
+          const hid = around.filter(a => a.hid && !a.flag);
+          if (!hid.length) continue;
+          if (flags === c.n) {                     /* everything else is safe */
+            await clickEl(hid[0]);
+            await sleep(rnd(250, 600));
+            did = true; break;
+          }
+          if (hid.length === c.n - flags) {        /* everything left is a mine */
+            await flagCell(hid[0]);
+            await sleep(rnd(250, 550));
+            did = true; break;
+          }
+        }
+        if (did) { stuckRandoms = 0; continue; }
+
+        /* no certain move: take the least-risky hidden cell */
+        if (++stuckRandoms > 6) break;             /* enough guessing for one sitting */
+        let best = null, bestRisk = 9;
+        for (const c of hidden) {
+          let risk = 0.12;
+          for (const a of neigh(b, c)) {
+            if (a.open && a.n) {
+              const hods = neigh(b, a).filter(z => z.hid && !z.flag).length;
+              const fl = neigh(b, a).filter(z => z.flag).length;
+              if (hods) risk = Math.max(risk, (a.n - fl) / hods);
+            }
+          }
+          if (risk < bestRisk - 1e-9 || (Math.abs(risk - bestRisk) < 1e-9 && Math.random() < 0.3)) {
+            bestRisk = risk; best = c;
+          }
+        }
+        await sleep(rnd(500, 1200));               /* thinking pause before a guess */
+        await clickEl(best || pick(hidden));
+        await sleep(rnd(250, 600));
+      }
+      b = read();
+      const lost = Object.values(b.cells).some(c => c.boom);
+      const wonIt = !lost && !Object.values(b.cells).some(c => c.hid && !c.flag);
+      await sleep(rnd(1000, 1900));                /* reflect on the result */
+      games++;
+      if ((lost || !wonIt) && games < 2) {
+        const face = w.el.querySelector(".mine-face");
+        if (face) { myFlags.clear(); await clickEl(face); await sleep(rnd(500, 900)); }
+      } else break;
+    }
+    await maybeClose(w);
   }
 
   async function actBrowse() {
@@ -244,6 +348,7 @@ W98.Autopilot = (() => {
       await sleep(rnd(1500, 2500));
     }
     await sleep(rnd(1000, 2000));
+    await maybeClose(w, 0.7);
   }
 
   async function actMail() {
@@ -257,6 +362,7 @@ W98.Autopilot = (() => {
       await sleep(rnd(3000, 6000));   /* reading aunt carol takes time */
     }
     await sleep(rnd(800, 1500));
+    await maybeClose(w);
   }
 
   async function actClaude() {
@@ -274,6 +380,7 @@ W98.Autopilot = (() => {
       await clickEl(send);
       await sleep(rnd(5000, 9000));   /* 28.8k streaming takes what it takes */
     }
+    await maybeClose(w, 0.7);
   }
 
   async function actPaint() {
@@ -302,6 +409,7 @@ W98.Autopilot = (() => {
       await sleep(rnd(500, 1200));
     }
     await sleep(rnd(900, 1600));
+    await maybeClose(w, 0.8);
   }
 
   async function actMusic() {
@@ -360,18 +468,10 @@ W98.Autopilot = (() => {
         try { await act.run(); } catch (e) { if (e === STOP) throw e; }
         check();
         /* between tasks: maybe tidy one window, always pause like a person */
-        if (Math.random() < 0.4) {
+        {
           const open = WM.wins.filter(w => !w.closed && !w.opts.noTaskbar);
-          if (open.length > 3) {
-            const w = pick(open);
-            const closeBtn = w.el.querySelector(".t-btn.close");
-            if (closeBtn) { try { await clickEl(closeBtn); } catch (e) { if (e === STOP) throw e; } }
-            await sleep(400);
-            const box = WM.wins.find(x => !x.closed && x.opts.noTaskbar && /save|儲存/i.test(x.el.textContent));
-            if (box) {
-              const no = [...box.el.querySelectorAll("button")].find(b => /^(No|否)$/.test(b.textContent.trim()));
-              if (no) { try { await clickEl(no); } catch (e) { if (e === STOP) throw e; } }
-            }
+          if (open.length > 2) {
+            try { await closeWin(open[0]); } catch (e) { if (e === STOP) throw e; }
           }
         }
         await sleep(rnd(1500, 4000));
@@ -384,6 +484,9 @@ W98.Autopilot = (() => {
   /* ---------- takeover / handback ---------- */
   function realInput(e) {
     if (!e.isTrusted) return;
+    if (e.key !== "Escape") return;
+    e.preventDefault();
+    e.stopPropagation();
     stop(true);
   }
 
@@ -396,27 +499,21 @@ W98.Autopilot = (() => {
     banner = el("div", {
       style: "position:absolute;top:6px;right:8px;z-index:99991;background:#000080;color:#fff;" +
         "font-family:Tahoma,sans-serif;font-size:11px;padding:4px 10px;border:1px solid #fff;pointer-events:none;opacity:0.92"
-    }, el("span", { text: W98.tr("AUTOPILOT — BOB is using this computer. Move the mouse to take it back.") }));
+    }, el("span", { text: W98.tr("AUTOPILOT — BOB is using this computer. Press ESC to take it back.") }));
     $("#screen").append(banner);
     Sound.play("info");
     /* grace period so the click that started autopilot doesn't end it */
     setTimeout(() => {
       if (!active) return;
-      document.addEventListener("mousemove", realInput, true);
-      document.addEventListener("mousedown", realInput, true);
       document.addEventListener("keydown", realInput, true);
-      document.addEventListener("wheel", realInput, true);
-    }, 1200);
+    }, 600);
     runLoop();
   }
 
   function stop(byUser) {
     if (!active) return;
     active = false;
-    document.removeEventListener("mousemove", realInput, true);
-    document.removeEventListener("mousedown", realInput, true);
     document.removeEventListener("keydown", realInput, true);
-    document.removeEventListener("wheel", realInput, true);
     if (cursorEl) { cursorEl.remove(); cursorEl = null; }
     if (banner) { banner.remove(); banner = null; }
     if (byUser) {
@@ -433,10 +530,11 @@ W98.Autopilot = (() => {
   function confirmStart() {
     WM.msgbox({
       title: "Autopilot 98", icon: "claude98",
-      text: W98.tr("Hand this computer to BOB?\n\nBOB will browse, type, play and lose at Minesweeper\nlike a real 1998 user. Move the mouse or press any\nkey at any time to take back control."),
+      text: W98.tr("Hand this computer to BOB?\n\nBOB will browse, type, tidy his windows and play a\nrespectable game of Minesweeper. Press ESC at any\ntime to take back control."),
       buttons: ["Engage", "Cancel"]
     }).then(r => { if (r === "Engage") start(); });
   }
 
-  return { start, stop, confirmStart, get active() { return active; } };
+  return { start, stop, confirmStart, get active() { return active; },
+    _act: (id) => { const a = ACTIVITIES.find(x => x.id === id); return a && a.run(); } };
 })();

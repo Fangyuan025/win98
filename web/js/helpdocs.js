@@ -24,8 +24,8 @@ W98.HelpTopics = {
     and Claude Desktop 98 on the desktop.</p>
     <p><b>Autopilot 98</b> (Start menu) hands the machine to BOB, a ghost user who opens programs
     from the Start menu, types diary entries with real typos, browses the web (dialing up first if
-    needed), chats with Claude, doodles in Paint and loses at Minesweeper — until you move the mouse,
-    at which point the computer is instantly yours again.</p>`],
+    needed), chats with Claude, doodles in Paint and plays a genuinely competent game of Minesweeper (flags and all) — and cleans up his own windows.
+    Press <b>ESC</b> at any time and the computer is instantly yours again.</p>`],
 
   shortcuts: ["Keyboard shortcuts", `
     <h2>Keyboard shortcuts</h2>

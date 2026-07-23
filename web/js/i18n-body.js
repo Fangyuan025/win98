@@ -380,8 +380,8 @@ W98.I18N_BODY_ZH = {
   "Press any key to skip.": "按任意鍵跳過。",
 
   /* ---- Autopilot 98 ---- */
-  "AUTOPILOT — BOB is using this computer. Move the mouse to take it back.":
-    "託管中 — BOB 正在使用這台電腦。動一下滑鼠即可取回。",
+  "AUTOPILOT — BOB is using this computer. Press ESC to take it back.":
+    "託管中 — BOB 正在使用這台電腦。按 ESC 即可取回。",
   "You have taken back control. BOB says goodbye.": "您已取回控制權。BOB 說再見。",
   "Hand this computer to BOB?\n\nBOB will browse, type, play and lose at Minesweeper\nlike a real 1998 user. Move the mouse or press any\nkey at any time to take back control.":
     "把這台電腦交給 BOB？\n\nBOB 會像真正的 1998 年使用者一樣瀏覽、打字、\n玩遊戲、輸掉踩地雷。隨時動滑鼠或按任意鍵\n即可取回控制權。",
