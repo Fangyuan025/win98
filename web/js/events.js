@@ -5,9 +5,7 @@
 "use strict";
 W98.Events = (() => {
   const fired = {};                 // per-session counts
-  let lastEventAt = Date.now();     // global cooldown anchor
-  const sessionStart = Date.now();
-  const GLOBAL_COOLDOWN = 4 * 60 * 1000;
+  let lastEventAt = 0;              // refractory anchor (events never stack)
 
   const on = () => Store.get("eraEvents", true);
 
@@ -131,37 +129,40 @@ W98.Events = (() => {
     });
   }
 
-  /* ---------- the scheduler ---------- */
+  /* ---------- the scheduler: pure chance, no timetable ----------
+     Every minute each eligible event rolls its own independent dice (a
+     geometric distribution). Nothing is scheduled; a blue screen is exactly
+     as possible in minute one as in hour three — that is what made it 1998.
+     Events with a real cause keep their cause: lowMemory needs a crowded
+     desktop, callWaiting needs a phone call in progress, and the ScanDisk
+     boot check (boot.js) fires only after an improper shutdown. */
   const EVENTS = [
-    { id: "chainMail", weight: 4, max: 3, minUptime: 3 * 60e3, run: chainMail },
-    { id: "popupAd", weight: 3, max: 2, minUptime: 5 * 60e3,
+    { id: "chainMail",   p: 0.025, max: 3, run: chainMail },
+    { id: "popupAd",     p: 0.020, max: 2,
       cond: () => WM.wins.some(w => !w.closed && /Internet Explorer/.test(w.title)), run: popupAd },
-    { id: "lowMemory", weight: 3, max: 2, minUptime: 6 * 60e3, run: lowMemory },
-    { id: "callWaiting", weight: 2, max: 1, minUptime: 8 * 60e3,
+    { id: "lowMemory",   p: 0.040, max: 2,
+      cond: () => WM.wins.filter(w => !w.closed && !w.opts.noTaskbar).length >= 7, run: lowMemory },
+    { id: "callWaiting", p: 0.015, max: 1,
       cond: () => W98.Net && W98.Net.connected, run: callWaiting },
-    { id: "newHardware", weight: 2, max: 1, minUptime: 10 * 60e3, run: newHardware },
-    { id: "bsod", weight: 1, max: 1, minUptime: 18 * 60e3, run: bsod }
+    { id: "newHardware", p: 0.008, max: 1, run: newHardware },
+    { id: "bsod",        p: 0.005, max: 1, run: bsod }
   ];
 
   function tick() {
     if (!on()) return;
-    if (Date.now() - lastEventAt < GLOBAL_COOLDOWN) return;
+    /* short refractory period only, so two events never pile on top of each other */
+    if (Date.now() - lastEventAt < 90 * 1000) return;
     /* no interruptions while a modal-ish dialog or screensaver is up */
     if (document.querySelector("#screen > .saver, .msgbox-btns") && WM.wins.some(w => !w.closed && w.opts.noTaskbar)) return;
-    const uptime = Date.now() - sessionStart;
-    const pool = EVENTS.filter(e =>
-      (fired[e.id] || 0) < e.max &&
-      uptime >= e.minUptime &&
-      (!e.cond || e.cond()));
-    if (!pool.length) return;
-    /* one roll of the dice per minute; most minutes nothing happens (that is the point) */
-    if (Math.random() > 0.22) return;
-    const total = pool.reduce((a, e) => a + e.weight, 0);
-    let r = Math.random() * total;
-    const ev = pool.find(e => (r -= e.weight) <= 0) || pool[0];
-    if (ev.run() === false) return;   /* event declined (condition changed) — no cooldown */
-    fired[ev.id] = (fired[ev.id] || 0) + 1;
-    lastEventAt = Date.now();
+    for (const e of EVENTS) {
+      if ((fired[e.id] || 0) >= e.max) continue;
+      if (e.cond && !e.cond()) continue;
+      if (Math.random() >= e.p) continue;
+      if (e.run() === false) continue;   /* declined — condition changed mid-roll */
+      fired[e.id] = (fired[e.id] || 0) + 1;
+      lastEventAt = Date.now();
+      break;                             /* at most one event per minute */
+    }
   }
 
   function init() {
