@@ -140,10 +140,13 @@ W98.Apps.pinball = {
       return false;
     }
 
+    let prevLeftAng = 0, prevRightAng = 0;
     function step() {
       if (over) { draw(); return; }
+      const la0 = leftAng, ra0 = rightAng;
       leftAng += ((leftUp ? 0.95 : 0) - leftAng) * 0.55;
       rightAng += ((rightUp ? 0.95 : 0) - rightAng) * 0.55;
+      prevLeftAng = la0; prevRightAng = ra0;
       if (charging) charge = Math.min(16, charge + 0.35);
 
       const fls = flipSeg(FL, false, leftAng);
@@ -156,14 +159,22 @@ W98.Apps.pinball = {
         const sp = Math.hypot(ball.vx, ball.vy);
         if (sp > 14) { ball.vx *= 14 / sp; ball.vy *= 14 / sp; }
 
-        /* substepped movement so a fast ball cannot tunnel through thin walls */
-        const sub = Math.max(1, Math.ceil(Math.hypot(ball.vx, ball.vy) / 3));
+        /* substepped movement so neither a fast ball nor a fast-sweeping
+           flipper can tunnel: the flipper angle is interpolated through the
+           substeps, so its swept arc is solid instead of teleporting */
+        const flipSweep = Math.max(Math.abs(leftAng - prevLeftAng), Math.abs(rightAng - prevRightAng)) * 62;
+        const sub = Math.max(1, Math.ceil(Math.hypot(ball.vx, ball.vy) / 3), Math.ceil(flipSweep / 4));
         for (let s2 = 0; s2 < sub; s2++) {
+          const t = (s2 + 1) / sub;
+          const la = prevLeftAng + (leftAng - prevLeftAng) * t;
+          const ra = prevRightAng + (rightAng - prevRightAng) * t;
+          const fl2 = flipSeg(FL, false, la);
+          const fr2 = flipSeg(FR, true, ra);
           ball.x += ball.vx / sub;
           ball.y += ball.vy / sub;
           for (const s of SEGS) collideSeg(s[0], s[1], s[2], s[3]);
-          collideSeg(fls[0], fls[1], fls[2], fls[3], leftUp && leftAng < 0.9 ? 9.5 : 0);
-          collideSeg(frs[0], frs[1], frs[2], frs[3], rightUp && rightAng < 0.9 ? 9.5 : 0);
+          collideSeg(fl2[0], fl2[1], fl2[2], fl2[3], leftUp && la < 0.9 ? 9.5 : 0);
+          collideSeg(fr2[0], fr2[1], fr2[2], fr2[3], rightUp && ra < 0.9 ? 9.5 : 0);
         }
         for (const b of BUMPERS) {
           const d = Math.hypot(ball.x - b.x, ball.y - b.y);
