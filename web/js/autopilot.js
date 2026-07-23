@@ -6,19 +6,46 @@
 "use strict";
 W98.Autopilot = (() => {
   let active = false;
-  let cursorEl = null, banner = null;
+  let cursorEl = null, banner = null, shield = null;
   let cx = 400, cy = 300;
   let lastActivity = "";
   const STOP = Symbol("autopilot-stop");
+  const TRACE = [];
+  const trace = (m) => { TRACE.push(m); if (TRACE.length > 80) TRACE.shift(); };
   const rnd = (a, b) => a + Math.random() * (b - a);
   const pick = (arr) => arr[(Math.random() * arr.length) | 0];
 
   /* ---------- abort-aware primitives ---------- */
   function check() { if (!active) throw STOP; }
+  let turbo = false;   /* test mode: compress the waits, keep the logic */
+  /* worker-driven timing: page timers are throttled to 1s+ when the window is
+     hidden, but worker timers are not — BOB keeps working while minimized */
+  let sleepWorker = null;
+  const sleepCbs = new Map();
+  let sleepSeq = 0;
+  try {
+    sleepWorker = new Worker(URL.createObjectURL(new Blob(
+      ["onmessage=function(e){setTimeout(function(){postMessage(e.data.id)},e.data.ms)}"],
+      { type: "application/javascript" })));
+    sleepWorker.onmessage = (e) => {
+      const cb = sleepCbs.get(e.data);
+      sleepCbs.delete(e.data);
+      if (cb) cb();
+    };
+  } catch (e) { sleepWorker = null; }
+
   function sleep(ms) {
+    if (turbo) ms = Math.max(1, ms / 15);
     return new Promise((res, rej) => {
-      const t = setTimeout(() => active ? res() : rej(STOP), ms);
-      if (!active) { clearTimeout(t); rej(STOP); }
+      if (!active) { rej(STOP); return; }
+      const done = () => active ? res() : rej(STOP);
+      if (sleepWorker) {
+        const id = ++sleepSeq;
+        sleepCbs.set(id, done);
+        sleepWorker.postMessage({ id, ms });
+      } else {
+        setTimeout(done, ms);
+      }
     });
   }
 
@@ -66,7 +93,8 @@ W98.Autopilot = (() => {
 
   async function clickEl(el2, kind) {
     check();
-    if (!el2 || !el2.isConnected) throw STOP;
+    if (!el2 || !el2.isConnected) { trace("clickEl: disconnected " + (el2 && el2.className)); throw STOP; }
+    trace("click " + (el2.className || el2.tagName));
     const p = screenPoint(el2);
     await moveTo(p.x, p.y);
     await sleep(rnd(90, 260));
@@ -130,10 +158,15 @@ W98.Autopilot = (() => {
     const w = WM.wins.find(x => !x.closed && !x.opts.noTaskbar &&
       ((x.opts.appId && x.opts.appId === appId) || (titleFrag && x.title.indexOf(titleFrag) >= 0)));
     if (!w) return null;
-    const btn = [...document.querySelectorAll("#taskbar button")]
-      .find(b => b.textContent.trim().length > 2 && w.title.indexOf(b.textContent.trim().replace(/\.\.\.$/, "").slice(0, 10)) >= 0);
-    if (btn) await clickEl(btn);
-    else await clickEl(w.el.querySelector(".titlebar") || w.el, "down");
+    if (w.minimized) {
+      /* a taskbar click restores a minimized window; never click it otherwise
+         (clicking a focused window's button MINIMIZES it — BOB learned this) */
+      const btn = [...document.querySelectorAll("#taskbar button")]
+        .find(b => b.textContent.trim().length > 2 && w.title.indexOf(b.textContent.trim().replace(/\.\.\.$/, "").slice(0, 10)) >= 0);
+      if (btn) await clickEl(btn); else if (w.restore) w.restore();
+    } else {
+      await clickEl(w.el.querySelector(".titlebar") || w.el, "down");
+    }
     await sleep(rnd(300, 600));
     if (w.minimized && w.restore) w.restore();
     return w;
@@ -151,12 +184,16 @@ W98.Autopilot = (() => {
       const ic = [...document.querySelectorAll("#desktop > div")]
         .find(d => d.textContent.trim().startsWith(name.slice(0, 12)));
       if (ic) {
+        const before = WM.wins.filter(x => !x.closed).length;
         await clickEl(ic, "down");
         await sleep(rnd(180, 380));
         const p = screenPoint(ic);
         ic.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: p.x, clientY: p.y, button: 0 }));
-        await sleep(rnd(700, 1200));
-        return WM.wins[WM.wins.length - 1];
+        for (let i = 0; i < 8; i++) {
+          await sleep(250);
+          if (WM.wins.filter(x => !x.closed).length > before) return WM.wins[WM.wins.length - 1];
+        }
+        /* nothing opened — fall through to the Start menu */
       }
     }
 
@@ -293,11 +330,12 @@ W98.Autopilot = (() => {
     while (games < 2) {
       check();
       let b = read();
+      trace("mine cells=" + Object.keys(b.cells).length);
       const anyOpen = Object.values(b.cells).some(c => c.open);
       if (!anyOpen) {   /* opening move: somewhere near the middle */
         const mid = Object.values(b.cells).filter(c => c.hid &&
           Math.abs(c.x - b.maxX / 2) < 3 && Math.abs(c.y - b.maxY / 2) < 3);
-        await clickEl(pick(mid.length ? mid : Object.values(b.cells).filter(c => c.hid)));
+        await clickEl(pick(mid.length ? mid : Object.values(b.cells).filter(c => c.hid)).el);
         await sleep(rnd(400, 800));
       }
       let moves = 0, stuckRandoms = 0;
@@ -318,7 +356,7 @@ W98.Autopilot = (() => {
           const hid = around.filter(a => a.hid && !a.flag);
           if (!hid.length) continue;
           if (flags === c.n) {                     /* everything else is safe */
-            await clickEl(hid[0]);
+            await clickEl(hid[0].el);
             await sleep(rnd(250, 600));
             did = true; break;
           }
@@ -347,10 +385,11 @@ W98.Autopilot = (() => {
           }
         }
         await sleep(rnd(500, 1200));               /* thinking pause before a guess */
-        await clickEl(best || pick(hidden));
+        await clickEl((best || pick(hidden)).el);
         await sleep(rnd(250, 600));
       }
       b = read();
+      trace("mine end opened=" + Object.values(b.cells).filter(c => c.open).length);
       const lost = Object.values(b.cells).some(c => c.boom);
       const wonIt = !lost && !Object.values(b.cells).some(c => c.hid && !c.flag);
       await sleep(rnd(1000, 1900));                /* reflect on the result */
@@ -552,10 +591,25 @@ W98.Autopilot = (() => {
     { id: "shuffle", w: 1, run: actWindowShuffle }
   ];
 
+  async function dismissStrays() {
+    /* popup ads, era dialogs, wizards — BOB sighs and closes them */
+    for (let i = 0; i < 3; i++) {
+      const stray = WM.wins.find(x => !x.closed && x.opts.noTaskbar);
+      if (!stray) return;
+      const btn = [...stray.el.querySelectorAll("button")]
+        .find(b => /^(OK|Close|No|Cancel|Finish|確定|關閉|否|取消|完成)$/.test(b.textContent.trim()));
+      try {
+        if (btn) await clickEl(btn); else stray.close(true);
+      } catch (e) { if (e === STOP) throw e; }
+      await sleep(400);
+    }
+  }
+
   async function runLoop() {
     try {
       await sleep(600);
       while (active) {
+        await dismissStrays();
         const pool = ACTIVITIES.filter(a => a.id !== lastActivity);
         const total = pool.reduce((s, a) => s + a.w, 0);
         let r = Math.random() * total;
@@ -592,6 +646,9 @@ W98.Autopilot = (() => {
     lastActivity = "";
     cx = 400; cy = 300;
     makeCursor();
+    shield = el("div", { style: "position:absolute;inset:0;z-index:99900;background:transparent" });
+    shield.addEventListener("contextmenu", (e) => e.preventDefault());
+    $("#screen").append(shield);
     banner = el("div", {
       style: "position:absolute;top:6px;right:8px;z-index:99991;background:#000080;color:#fff;" +
         "font-family:Tahoma,sans-serif;font-size:11px;padding:4px 10px;border:1px solid #fff;pointer-events:none;opacity:0.92"
@@ -611,6 +668,7 @@ W98.Autopilot = (() => {
     active = false;
     document.removeEventListener("keydown", realInput, true);
     if (cursorEl) { cursorEl.remove(); cursorEl = null; }
+    if (shield) { shield.remove(); shield = null; }
     if (banner) { banner.remove(); banner = null; }
     if (byUser) {
       Sound.play("ding");
@@ -631,6 +689,16 @@ W98.Autopilot = (() => {
     }).then(r => { if (r === "Engage") start(); });
   }
 
-  return { start, stop, confirmStart, get active() { return active; },
-    _act: (id) => { const a = ACTIVITIES.find(x => x.id === id); return a && a.run(); } };
+  return { start, stop, confirmStart, get active() { return active; }, _trace: TRACE,
+    _act: (id) => { const a = ACTIVITIES.find(x => x.id === id); return a && a.run(); },
+    /* run one activity in isolation (testing) — no main loop competing for the hand */
+    _solo: async (id, fast) => {
+      if (active) return "already active";
+      active = true; turbo = !!fast; cx = 400; cy = 300;
+      makeCursor();
+      try { await ACTIVITIES.find(x => x.id === id).run(); }
+      catch (e) { if (e !== STOP) throw e; }
+      finally { turbo = false; stop(false); }
+      return "done";
+    } };
 })();

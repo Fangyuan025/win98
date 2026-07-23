@@ -150,6 +150,7 @@ W98.Events = (() => {
 
   function tick() {
     if (!on()) return;
+    if (W98.Autopilot && W98.Autopilot.active) return;   /* BOB has enough problems */
     /* short refractory period only, so two events never pile on top of each other */
     if (Date.now() - lastEventAt < 90 * 1000) return;
     /* no interruptions while a modal-ish dialog or screensaver is up */
