@@ -133,7 +133,7 @@ W98.Apps = W98.Apps || {};
       function dealRow() {
         if (!stock.length) return;
         if (cols.some(c => c.length === 0)) {
-          WM.msgbox({ title: "Spider Solitaire", icon: "warning", text: W98.tr("You cannot deal while a column is empty.\nEvery column must hold at least one card.") });
+          WM.msgbox({ title: "Spider Solitaire", icon: "warn", text: W98.tr("You cannot deal while a column is empty.\nEvery column must hold at least one card.") });
           return;
         }
         for (let i = 0; i < 10 && stock.length; i++) {
@@ -153,7 +153,7 @@ W98.Apps = W98.Apps || {};
         const stockEl = el("div", {
           class: "card facedown",
           style: "position:absolute;left:8px;top:4px;width:62px;height:84px;cursor:pointer",
-          title: W98.tr("Deal a new row")
+          dataset: { tip: "Deal a new row" }
         });
         if (!stock.length) { stockEl.classList.remove("facedown"); stockEl.style.opacity = "0.25"; }
         stockEl.append(el("div", { style: "position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:11px;color:#fff", text: stock.length ? String(stock.length / 10 | 0) : "" }));

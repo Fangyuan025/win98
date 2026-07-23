@@ -170,6 +170,9 @@ W98.Apps.stackz = {
 
     win.el.tabIndex = -1;
     cv.addEventListener("mousedown", () => win.el.focus());
+    win.el.addEventListener("focusout", (e) => {
+      if (!win.el.contains(e.relatedTarget) && state === "play") togglePause();
+    });
     win.ctxMenu = () => [
       { label: "New Game", accel: "F2", click: () => win.el.dispatchEvent(new KeyboardEvent("keydown", { key: "F2", bubbles: true })) }
     ];

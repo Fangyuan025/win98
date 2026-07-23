@@ -242,6 +242,7 @@ W98.Apps.solitaire = {
 
     function onStock(e) {
       e.preventDefault();
+      if (!state.stock.length && !state.waste.length) return;   /* nothing to do */
       snapshot();
       if (state.stock.length) {
         const n = Math.min(draw3 ? 3 : 1, state.stock.length);
@@ -253,6 +254,7 @@ W98.Apps.solitaire = {
       } else if (state.waste.length) {
         passes++;
         if (!draw3 && passes >= 1) addScore(-100);
+        if (draw3 && passes >= 4) addScore(-20);   /* MS rules: -20 from the 4th pass on */
         while (state.waste.length) {
           const it = state.waste.pop();
           it.up = false;

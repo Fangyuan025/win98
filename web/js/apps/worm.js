@@ -15,6 +15,7 @@ W98.Apps.worm = {
       menus: [
         { label: "Game", items: () => [
           { label: "New Game", accel: "F2", click: newGame },
+          { label: "Pause", accel: "P", click: () => togglePause() },
           "-",
           { label: "Exit", click: () => win.close() }
         ]},
@@ -58,6 +59,10 @@ W98.Apps.worm = {
       win.setStatus(1, "High: " + Store.get("wormHigh", 0));
     }
 
+    function togglePause() {
+      if (state === "play") { state = "pause"; draw(); }
+      else if (state === "pause") { state = "play"; }
+    }
     function step() {
       if (state !== "play") return;
       dir = nextDir;
@@ -115,6 +120,12 @@ W98.Apps.worm = {
       x.textAlign = "center"; x.textBaseline = "middle";
       x.fillText(String(foodVal), food[1] * CS + CS / 2, food[0] * CS + CS / 2 + 1);
       x.textAlign = "left"; x.textBaseline = "alphabetic";
+      if (state === "pause") {
+        x.fillStyle = "rgba(0,0,0,0.55)"; x.fillRect(0, H / 2 - 26, W, 52);
+        x.fillStyle = "#00ff00"; x.font = "bold 18px 'Courier New', monospace"; x.textAlign = "center";
+        x.fillText("P A U S E D", W / 2, H / 2 + 6);
+        x.textAlign = "left";
+      }
       if (state === "over") {
         x.fillStyle = "rgba(0,0,0,0.55)"; x.fillRect(0, H / 2 - 26, W, 52);
         x.fillStyle = "#00ff00"; x.font = "bold 18px 'Courier New', monospace"; x.textAlign = "center";
@@ -125,7 +136,10 @@ W98.Apps.worm = {
     }
 
     win.el.tabIndex = -1;
-    cv.addEventListener("mousedown", () => win.el.focus());
+    cv.addEventListener("mousedown", () => { win.el.focus(); if (state === "pause") togglePause(); });
+    win.el.addEventListener("focusout", (e) => {
+      if (!win.el.contains(e.relatedTarget) && state === "play") togglePause();
+    });
     win.ctxMenu = () => [
       { label: "New Game", accel: "F2", click: () => win.el.dispatchEvent(new KeyboardEvent("keydown", { key: "F2", bubbles: true })) }
     ];
@@ -142,6 +156,7 @@ W98.Apps.worm = {
         }
       }
       if (e.key === "F2") { e.preventDefault(); newGame(); }
+      if (e.key === "p" || e.key === "P") { e.preventDefault(); togglePause(); }
     });
 
     newGame();

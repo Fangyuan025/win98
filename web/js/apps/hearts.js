@@ -178,7 +178,8 @@ W98.Apps.hearts = {
         for (let p = 0; p < 4; p++) roundScores[p] = p === shooter ? 0 : 26;
       }
       for (let p = 0; p < 4; p++) scores[p] += roundScores[p];
-      const over = scores.some(s => s >= 100);
+      const m = Math.min(...scores);
+      const over = scores.some(s => s >= 100) && scores.filter(s => s === m).length === 1;
       showScore(() => {
         if (over) {
           const winIdx = scores.indexOf(Math.min(...scores));

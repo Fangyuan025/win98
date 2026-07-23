@@ -66,7 +66,7 @@ W98.Apps.minesweeper = {
     function startTimer() {
       if (started) return;
       started = true;
-      timer = setInterval(() => { time++; setLeds(timeLeds, time); }, 1000);
+      timer = setInterval(() => { if (time < 999) { time++; setLeds(timeLeds, time); } }, 1000);
     }
 
     function renderGrid() {

@@ -121,7 +121,7 @@ W98.Apps.ski = {
             Sound.play("error");
           } else if (o.type === "dog" && dx < 12 && dy < 10) {
             score = Math.max(0, score - 50);
-            o.vx *= -1.5;
+            o.vx = clamp(o.vx * -1.5, -2.4, 2.4);
             Sound.play("warn");
             win.setStatus(1, "Style: " + score + "  (you upset the dog)");
           }
@@ -241,6 +241,9 @@ W98.Apps.ski = {
       if (e.key === "F2") { e.preventDefault(); newGame(); }
     });
     win.el.addEventListener("keyup", (e) => { keys[e.key] = false; });
+    win.el.addEventListener("focusout", (e) => {
+      if (!win.el.contains(e.relatedTarget)) for (const k in keys) keys[k] = false;
+    });
 
     newGame();
     /* wall-clock compensation: if the environment throttles timers, catch up */

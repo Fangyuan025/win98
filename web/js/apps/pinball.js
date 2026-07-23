@@ -330,6 +330,9 @@ W98.Apps.pinball = {
         charging = false; charge = 0;
       }
     });
+    win.el.addEventListener("focusout", (e) => {
+      if (!win.el.contains(e.relatedTarget)) { leftUp = false; rightUp = false; charging = false; charge = 0; }
+    });
     /* clicking the table always re-arms the keyboard, and flips for trackpads */
     cv.addEventListener("mousedown", (e) => {
       win.el.focus();

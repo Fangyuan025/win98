@@ -8,6 +8,7 @@ W98.Apps.freecell = {
     const RANKS = ["", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
     const isRed = s => s === 1 || s === 2;
     let gameNum = 0;
+    let won = false;
     let state = null;       // { free:[4], found:[4], cols:[8][] }  cards {r,s}
     let sel = null;         // { from:'col'|'free', idx, count }
     let undoStack = [];
@@ -36,6 +37,7 @@ W98.Apps.freecell = {
       cards.forEach((c, i) => state.cols[i % 8].push(c));
       sel = null;
       undoStack = [];
+      won = false;
       win.setTitle("FreeCell Game #" + n);
       render();
     }
@@ -187,11 +189,11 @@ W98.Apps.freecell = {
       const left = 52 - state.found.reduce((a, f) => a + f.length, 0);
       win.setStatus(0, "Cards left: " + left);
       win.setStatus(1, gameNum ? "Game #" + gameNum : "");
-      if (left === 0) setTimeout(() => {
+      if (left === 0 && !won) { won = true; setTimeout(() => {
         Sound.play("tada");
         WM.msgbox({ title: "FreeCell", icon: "info", text: "Congratulations, you win!\nDo you want to play again?", buttons: ["Yes", "No"] })
           .then(r => { if (r === "Yes") deal(1 + ((Math.random() * 32000) | 0)); });
-      }, 200);
+      }, 200); }
     }
 
     /* ---------- interactions (click-select, click-drop) ---------- */

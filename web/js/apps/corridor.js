@@ -494,6 +494,9 @@ W98.Apps = W98.Apps || {};
         if (k.startsWith("Arrow")) e.preventDefault();
       });
       win.el.addEventListener("keyup", (e) => { keys[KEYMAP[e.key] || e.key] = false; });
+      win.el.addEventListener("focusout", (e) => {
+        if (!win.el.contains(e.relatedTarget)) for (const k in keys) keys[k] = false;
+      });
       cv.addEventListener("mousedown", (e) => { win.el.focus(); if (e.button === 0) shoot(); });
 
       /* regression hook */

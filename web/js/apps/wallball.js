@@ -16,6 +16,7 @@ W98.Apps.wallball = {
       menus: [
         { label: "Game", items: () => [
           { label: "New Game", accel: "F2", click: () => newGame(1) },
+          { label: "Pause", accel: "P", click: () => togglePause() },
           "-",
           { label: "Exit", click: () => win.close() }
         ]},
@@ -65,6 +66,10 @@ W98.Apps.wallball = {
       return grid[r][c] === 1;
     };
 
+    function togglePause() {
+      if (state === "play") state = "pause";
+      else if (state === "pause") state = "play";
+    }
     function step() {
       if (state !== "play") { draw(); return; }
       /* balls */
@@ -194,10 +199,10 @@ W98.Apps.wallball = {
         }
         x.stroke();
       }
-      if (state === "over") {
+      if (state === "over" || state === "pause") {
         x.fillStyle = "rgba(0,0,0,0.6)"; x.fillRect(0, H / 2 - 30, W, 60);
         x.fillStyle = "#fff"; x.font = "bold 20px Arial"; x.textAlign = "center";
-        x.fillText("GAME OVER — F2 to retry", W / 2, H / 2 + 6);
+        x.fillText(state === "over" ? "GAME OVER — F2 to retry" : "PAUSED — click to resume", W / 2, H / 2 + 6);
         x.textAlign = "left";
       }
     }
@@ -211,6 +216,7 @@ W98.Apps.wallball = {
     cv.addEventListener("mouseleave", () => { mouse.x = -1; });
     cv.addEventListener("mousedown", (e) => {
       win.el.focus();
+      if (state === "pause") { togglePause(); return; }
       if (state !== "play") return;
       const r2 = cv.getBoundingClientRect();
       const c = Math.floor((e.clientX - r2.left) / CS), r = Math.floor((e.clientY - r2.top) / CS);
@@ -226,6 +232,10 @@ W98.Apps.wallball = {
     ];
     win.el.addEventListener("keydown", (e) => {
       if (e.key === "F2") { e.preventDefault(); newGame(1); }
+      if (e.key === "p" || e.key === "P") { e.preventDefault(); togglePause(); }
+    });
+    win.el.addEventListener("focusout", (e) => {
+      if (!win.el.contains(e.relatedTarget) && state === "play") togglePause();
     });
 
     newGame(1);
