@@ -63,10 +63,11 @@ W98.Apps.ski = {
     function step() {
       if (state === "over") { draw(); return; }
       if (state === "crash") {
-        if (--crashT <= 0) state = "run";
+        if (--crashT <= 0) { state = "run"; invulnT = 30; }
         draw();
         return;
       }
+      if (invulnT > 0) invulnT--;
       if (state === "eaten") {
         /* the world holds its breath while the legend has lunch */
         monster.phase += 0.2;
@@ -105,8 +106,8 @@ W98.Apps.ski = {
       const density = 14 + Math.min(12, Math.floor(dist / 300));
       while (objs.length < density) spawn();
 
-      /* collisions (grounded only) */
-      if (state === "run") {
+      /* collisions (grounded only; brief mercy window after a crash) */
+      if (state === "run" && invulnT === 0) {
         for (const o of objs) {
           const dx = Math.abs(o.x - player.x), dy = Math.abs(o.y - 92);
           if (o.type === "ramp" && dx < 14 && dy < 10) {
@@ -148,15 +149,19 @@ W98.Apps.ski = {
       sync();
       draw();
     }
-    let crashT = 0, eatT = 0;
+    let crashT = 0, eatT = 0, invulnT = 0;
 
     function draw() {
       x.fillStyle = "#f4f8ff";
       x.fillRect(0, 0, W, H);
-      /* ski tracks */
-      x.strokeStyle = "#d8e0ec"; x.lineWidth = 2;
-      x.beginPath(); x.moveTo(player.x - 4, 100); x.lineTo(player.x - 4 - player.dir * 8, H);
-      x.moveTo(player.x + 4, 100); x.lineTo(player.x + 4 - player.dir * 8, H); x.stroke();
+      /* ski tracks trail BEHIND the skier (uphill), bending with the turn */
+      if (state === "run" || state === "crash") {
+        x.strokeStyle = "#d8e0ec"; x.lineWidth = 2;
+        x.beginPath();
+        x.moveTo(player.x - 4, 96); x.quadraticCurveTo(player.x - 4 - player.dir * 10, 50, player.x - 4 - player.dir * 26, 0);
+        x.moveTo(player.x + 4, 96); x.quadraticCurveTo(player.x + 4 - player.dir * 10, 50, player.x + 4 - player.dir * 26, 0);
+        x.stroke();
+      }
 
       objs.forEach(o => {
         if (o.type === "tree") {
@@ -194,7 +199,7 @@ W98.Apps.ski = {
         x.fillText("oof", player.x + 10, py);
       } else if (state === "eaten") {
         /* being carried off */
-      } else {
+      } else if (!(invulnT > 0 && (invulnT & 4))) {   /* blink during the mercy window */
         const air = state === "air" ? -8 : 0;
         x.strokeStyle = "#c02020"; x.lineWidth = 3;
         x.beginPath(); x.moveTo(player.x - 6 + lean, py + 8 + air); x.lineTo(player.x - 6 - lean, py - 16 + air); x.stroke();
@@ -250,7 +255,7 @@ W98.Apps.ski = {
     let lastT = performance.now();
     timer = setInterval(() => {
       const now = performance.now();
-      const steps = clamp(Math.round((now - lastT) / 30), 1, 6);
+      const steps = clamp(Math.round((now - lastT) / 30), 1, 40);
       lastT = now;
       for (let i = 0; i < steps; i++) step();
     }, 30);

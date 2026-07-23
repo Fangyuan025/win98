@@ -43,10 +43,11 @@ W98.Apps.pinball = {
     const FR = { px: 220, py: 496, len: 62 };
     const SEGS = [
       [2, 80, 2, H],                       // left wall
-      [W - 2, 80, W - 2, LANE_FLOOR],      // right wall (lane side)
+      [W - 2, 72, W - 2, LANE_FLOOR],      // right outer wall — lane stays open to the top
       [LANE_X, 130, LANE_X, LANE_FLOOR],   // lane divider (open above y=130)
       [LANE_X, LANE_FLOOR, W - 2, LANE_FLOOR],  // lane floor (plunger seat)
-      [2, 80, 60, 14], [60, 14, 240, 4], [240, 4, W - 2, 80],   // rounded top
+      [2, 80, 60, 14], [60, 14, 240, 4],            // rounded top (left + middle)
+      [240, 4, 306, 46], [306, 46, W - 2, 72],      // top-right arc: catches the launched ball, sends it left over the divider
       [2, 400, 92, 468], [92, 468, FL.px - 2, FL.py - 4],       // left funnel → flipper
       [LANE_X, 400, 228, 468], [228, 468, FR.px + 2, FR.py - 4] // right funnel → flipper
     ];
@@ -151,14 +152,17 @@ W98.Apps.pinball = {
         ball = bb;
         ball.vy += 0.25;
         ball.vx *= 0.999;
-        ball.x += ball.vx;
-        ball.y += ball.vy;
         const sp = Math.hypot(ball.vx, ball.vy);
         if (sp > 14) { ball.vx *= 14 / sp; ball.vy *= 14 / sp; }
 
-        /* two resolution passes for stability in corners */
-        for (let pass = 0; pass < 2; pass++) {
+        /* substepped movement so a fast ball cannot tunnel through thin walls */
+        const sub = Math.max(1, Math.ceil(Math.hypot(ball.vx, ball.vy) / 3));
+        for (let s2 = 0; s2 < sub; s2++) {
+          ball.x += ball.vx / sub;
+          ball.y += ball.vy / sub;
           for (const s of SEGS) collideSeg(s[0], s[1], s[2], s[3]);
+          collideSeg(fls[0], fls[1], fls[2], fls[3], leftUp && leftAng < 0.9 ? 9.5 : 0);
+          collideSeg(frs[0], frs[1], frs[2], frs[3], rightUp && rightAng < 0.9 ? 9.5 : 0);
         }
         for (const b of BUMPERS) {
           const d = Math.hypot(ball.x - b.x, ball.y - b.y);
@@ -190,12 +194,20 @@ W98.Apps.pinball = {
             sync();
           }
         }
-        /* flippers */
-        const hitL = collideSeg(fls[0], fls[1], fls[2], fls[3], leftUp && leftAng < 0.9 ? 9.5 : 0);
-        const hitR = collideSeg(frs[0], frs[1], frs[2], frs[3], rightUp && rightAng < 0.9 ? 9.5 : 0);
+        /* flipper contact sound (collision itself happens in the substeps) */
+        const hitL = collideSeg(fls[0], fls[1], fls[2], fls[3], 0);
+        const hitR = collideSeg(frs[0], frs[1], frs[2], frs[3], 0);
         if ((hitL && leftUp && leftAng < 0.9) || (hitR && rightUp && rightAng < 0.9)) blip(180, 0.05);
       }
       ball = bodies[0];
+      /* anti-stuck: a ball dawdling outside the plunger seat gets a polite nudge */
+      for (const bb of bodies) {
+        const atSeat = bb.x > LANE_X && bb.y > LANE_FLOOR - 40;
+        if (!atSeat && Math.hypot(bb.vx, bb.vy) < 0.18) {
+          bb.stuck = (bb.stuck || 0) + 1;
+          if (bb.stuck > 50) { bb.vx += (Math.random() - 0.5) * 1.6; bb.vy -= 1.2; bb.stuck = 0; }
+        } else bb.stuck = 0;
+      }
       BUMPERS.forEach(b => { if (b.flash) b.flash--; });
       GATES.forEach(g2 => { if (g2.cool) g2.cool--; });
 
@@ -306,7 +318,9 @@ W98.Apps.pinball = {
       count: () => 1 + extras.length,
       ballAt: () => [ball.x, ball.y],
       place: (px, py) => { ball.x = px; ball.y = py; ball.vx = 0; ball.vy = -1; },
-      ballsLeft: () => balls
+      ballsLeft: () => balls,
+      kick: (kx, ky) => { ball.vx = kx; ball.vy = ky; },
+      dbg: () => ({ charge, charging, vx: ball.vx, vy: ball.vy })
     };
 
     win.el.tabIndex = -1;
@@ -352,7 +366,7 @@ W98.Apps.pinball = {
     let lastT = performance.now();
     timer = setInterval(() => {
       const now = performance.now();
-      const steps = clamp(Math.round((now - lastT) / 16), 1, 5);
+      const steps = clamp(Math.round((now - lastT) / 16), 1, 40);
       lastT = now;
       for (let i = 0; i < steps; i++) step();
     }, 16);

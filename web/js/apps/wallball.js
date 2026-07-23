@@ -242,7 +242,7 @@ W98.Apps.wallball = {
     let lastT = performance.now();
     timer = setInterval(() => {
       const now = performance.now();
-      const steps = clamp(Math.round((now - lastT) / 22), 1, 6);
+      const steps = clamp(Math.round((now - lastT) / 22), 1, 40);
       lastT = now;
       for (let i = 0; i < steps; i++) step();
     }, 22);
