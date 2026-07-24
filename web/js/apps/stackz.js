@@ -191,6 +191,8 @@ W98.Apps.stackz = {
 
     newGame();
     setTimeout(() => win.el.focus(), 80);
+    win._stk = { state: () => ({ grid, piece, px: px2, py: py2, state }),
+      collide: (x, y, s) => collide(x, y, s) };
     return win;
   }
 };

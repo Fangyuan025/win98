@@ -161,6 +161,7 @@ W98.Apps.worm = {
 
     newGame();
     setTimeout(() => win.el.focus(), 80);
+    win._worm = { state: () => ({ snake, dir, food, state }) };
     return win;
   }
 };

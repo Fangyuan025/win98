@@ -35,6 +35,17 @@ W98.Autopilot = (() => {
     };
   } catch (e) { sleepWorker = null; }
 
+  function sleepReal(ms) {
+    return new Promise((res, rej) => {
+      if (!active) { rej(STOP); return; }
+      const done = () => (active && !abortAct) ? res() : rej(STOP);
+      if (sleepWorker) {
+        const id = ++sleepSeq;
+        sleepCbs.set(id, done);
+        sleepWorker.postMessage({ id, ms });
+      } else setTimeout(done, ms);
+    });
+  }
   function sleep(ms) {
     if (turbo) ms = Math.max(1, ms / 15);
     return new Promise((res, rej) => {
@@ -642,25 +653,47 @@ W98.Autopilot = (() => {
     if (w && !w.closed && !w.opts.noTaskbar) await maybeClose(w, 0.8);
   }
 
+  /* ---- Pinball: launch, then actually save the ball with timed flips ---- */
   async function actPinball() {
     const w = await ghostLaunch("pinball", "Star Pilot Pinball", "Pinball");
     if (!w || w.closed) return;
     await sleep(rnd(600, 1100));
-    /* pull the plunger: hold SPACE, release */
     w.el.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
-    await sleep(rnd(700, 1000));
+    await sleepReal(rnd(380, 1000));   /* every pull different — every orbit different */
     w.el.dispatchEvent(new KeyboardEvent("keyup", { key: " ", bubbles: true }));
-    /* flip at the ball now and then, like it helps */
-    for (let i = 0; i < 5; i++) {
+    let flips = 0, relaunches = 0;
+    for (let t = 0; t < 160; t++) {
       check();
-      await sleep(rnd(1200, 2500));
-      const k = Math.random() < 0.5 ? "z" : "/";
-      w.el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true }));
-      await sleep(rnd(120, 260));
-      w.el.dispatchEvent(new KeyboardEvent("keyup", { key: k, bubbles: true }));
+      const pos = w._pb && w._pb.ballAt ? w._pb.ballAt() : null;
+      if (pos) {
+        const [bx, by] = pos;
+        /* midfield crossing: stir the table for a livelier orbit */
+        if (by > 240 && by < 390 && bx < 315 && Math.random() < 0.35) {
+          await keyTap(w, Math.random() < 0.5 ? "z" : "/", 140);
+        }
+        /* ball dropping into the flipper zone → flip the correct side */
+        if (by > 395 && by < 505 && bx < 315) {
+          const k = bx < 160 ? "z" : "/";
+          await keyTap(w, k, 160);
+          flips++;
+          await sleep(300);
+          continue;
+        }
+        /* ball back at the plunger seat → launch again (up to 3 balls) */
+        if (bx > 315 && by > 430 && t > 20) {
+          relaunches++;
+          if (relaunches > 3) break;
+          await sleepReal(600);
+          w.el.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
+          await sleepReal(rnd(350, 1000));
+          w.el.dispatchEvent(new KeyboardEvent("keyup", { key: " ", bubbles: true }));
+          await sleepReal(400);
+        }
+      }
+      await sleepReal(110);
     }
-    await sleep(rnd(1000, 2000));
-    await maybeClose(w, 0.8);
+    await sleep(rnd(600, 1200));
+    await maybeClose(w, 0.85);
   }
 
   async function actExplorer() {
@@ -707,72 +740,225 @@ W98.Autopilot = (() => {
 
   /* ================= expert skills, wave 3 ================= */
 
+  /* ---- Solitaire: read the table, send cards home, move runs by drag ---- */
+  const RANKV = { A: 1, "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9, "10": 10, J: 11, Q: 12, K: 13 };
+  function readSolCards(w) {
+    return [...w.el.querySelectorAll(".card")].map(c => {
+      const t = c.textContent.trim();
+      const m = t.match(/^(A|10|[2-9JQK])(♠|♥|♦|♣)/);
+      return {
+        el: c, up: !c.classList.contains("facedown"),
+        rank: m ? RANKV[m[1]] : 0, suit: m ? m[2] : "",
+        red: c.classList.contains("red"),
+        x: parseInt(c.style.left, 10) || 0, y: parseInt(c.style.top, 10) || 0
+      };
+    });
+  }
+  async function dragCard(fromEl, toEl) {
+    const p1 = screenPoint(fromEl);
+    await moveTo(p1.x, p1.y);
+    const s = $("#screen").getBoundingClientRect();
+    fromEl.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, clientX: p1.x + s.left, clientY: p1.y + s.top, button: 0 }));
+    await sleep(120);
+    const p2 = screenPoint(toEl);
+    const steps = 10;
+    for (let i = 1; i <= steps; i++) {
+      const ix = p1.x + (p2.x - p1.x) * i / steps, iy = p1.y + (p2.y - p1.y) * i / steps;
+      document.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, clientX: ix + s.left, clientY: iy + s.top }));
+      cursorEl.style.left = ix + "px"; cursorEl.style.top = iy + "px";
+      cx = ix; cy = iy;
+      await sleep(28);
+    }
+    document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, clientX: p2.x + s.left, clientY: p2.y + s.top, button: 0 }));
+    await sleep(rnd(250, 500));
+  }
   async function actSolitaire() {
     const w = await ghostLaunch("solitaire", "Solitaire", "Solitaire");
     if (!w || w.closed) return;
     await sleep(rnd(700, 1200));
-    for (let i = 0; i < 5; i++) {
+    const VN = ["", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+    const SU = ["♣", "♦", "♥", "♠"];
+    const rankOf = (c) => c.r || c.v;
+    const face = (c) => VN[rankOf(c)] + SU[c.s];
+    const isRedS = (su) => su === 1 || su === 2;
+    const findCardEl = (c) => [...w.el.querySelectorAll(".card")]
+      .find(e => !e.classList.contains("facedown") && e.textContent.indexOf(face(c)) >= 0);
+    for (let round = 0; round < 24; round++) {
       check();
-      const stock = w.el.querySelector(".sol-slot");
-      if (stock) await clickEl(stock);
-      await sleep(rnd(500, 1100));
-      /* try to send something home */
-      const ups = [...w.el.querySelectorAll(".card")].filter(c => !c.classList.contains("facedown")).slice(-8);
-      if (ups.length && Math.random() < 0.7) {
-        const c = pick(ups);
-        const p = screenPoint(c);
-        await moveTo(p.x, p.y);
-        c.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: p.x, clientY: p.y, button: 0 }));
-        await sleep(rnd(400, 900));
+      const st = w._sol && w._sol.state();
+      if (!st) break;
+      const foundMax = {};
+      for (const pile of st.found) if (pile.length) {
+        const t0 = pile[pile.length - 1];
+        const t = t0.c || t0;
+        foundMax[t.s] = rankOf(t);
+      }
+      /* candidates: waste top + each tableau's face-up bottom card */
+      const cands = [];
+      if (st.waste.length) cands.push(st.waste[st.waste.length - 1].c || st.waste[st.waste.length - 1]);
+      for (const col of st.tab) if (col.length) { const e2 = col[col.length - 1]; if (e2.up) cands.push(e2.c); }
+      /* 1. send anything home */
+      const home = cands.find(c => rankOf(c) === (foundMax[c.s] || 0) + 1);
+      if (home) {
+        const elc = findCardEl(home);
+        if (elc) {
+          const p = screenPoint(elc);
+          await moveTo(p.x, p.y);
+          elc.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: p.x, clientY: p.y, button: 0 }));
+          await sleep(rnd(400, 800));
+          continue;
+        }
+      }
+      /* 2. move a run head onto another column (frees face-down cards) */
+      let moved = false;
+      for (let ci = 0; ci < st.tab.length && !moved; ci++) {
+        const col = st.tab[ci];
+        let head = -1;
+        for (let i = 0; i < col.length; i++) if (col[i].up) { head = i; break; }
+        if (head < 0) continue;
+        const hc = col[head].c;
+        for (let ti = 0; ti < st.tab.length; ti++) {
+          if (ti === ci) continue;
+          const dst = st.tab[ti];
+          if (!dst.length) { if (rankOf(hc) === 13 && head > 0) { /* king to empty */ } else continue; }
+          const dtop = dst.length ? dst[dst.length - 1] : null;
+          const dc = dtop && dtop.c;
+          if (!dst.length || (dtop.up && rankOf(dc) === rankOf(hc) + 1 && isRedS(dc.s) !== isRedS(hc.s))) {
+            const fromEl = findCardEl(hc);
+            const toEl = dst.length ? findCardEl(dc) : null;
+            if (fromEl && (toEl || !dst.length)) {
+              if (toEl) await dragCard(fromEl, toEl);
+              moved = true;
+              break;
+            }
+          }
+        }
+      }
+      if (moved) { await sleep(rnd(300, 700)); continue; }
+      /* 3. draw from the stock — the clickable thing is the card ON the slot */
+      const slot = w.el.querySelector(".sol-slot");
+      if (slot) {
+        const sx = parseInt(slot.style.left, 10) || 8, sy = parseInt(slot.style.top, 10) || 8;
+        const topCard = [...w.el.querySelectorAll(".card")].find(c =>
+          Math.abs((parseInt(c.style.left, 10) || 0) - sx) < 8 &&
+          Math.abs((parseInt(c.style.top, 10) || 0) - sy) < 8);
+        await clickEl(topCard || slot, "down");
+        await sleep(rnd(500, 900));
       }
     }
-    await sleep(rnd(800, 1500));
+    await sleep(rnd(900, 1500));
     await maybeClose(w);
   }
 
+  /* ---- Spider: BOB double-clicks runs (the game auto-picks the best home) ---- */
   async function actSpider() {
     const w = await ghostLaunch("spider", null, "Spider");
     if (!w || w.closed) return;
     await sleep(rnd(700, 1200));
-    for (let i = 0; i < 4; i++) {
+    const sig = () => w._spider ? w._spider.state().cols.join(",") : "";
+    for (let mv = 0; mv < 8; mv++) {
       check();
-      const cards = [...w.el.querySelectorAll(".card")].filter(c => !c.classList.contains("facedown"));
-      if (cards.length) {
-        await clickEl(pick(cards));            /* pick a run... */
-        await sleep(rnd(400, 800));
-        await clickEl(pick(cards));            /* ...and a destination; the game judges us */
-        await sleep(rnd(500, 1000));
+      const before = sig();
+      /* try up-cards from the tallest columns first — more likely to free a flip */
+      const ups = [...w.el.querySelectorAll(".card")]
+        .filter(c => !c.classList.contains("facedown") && (parseInt(c.style.top, 10) || 0) > 90)
+        .sort((a, b) => (parseInt(b.style.top, 10) || 0) - (parseInt(a.style.top, 10) || 0));
+      let changed = false;
+      for (let i = 0; i < Math.min(6, ups.length); i++) {
+        const c = ups[i];
+        if (!c.isConnected) continue;
+        const p = screenPoint(c);
+        await moveTo(p.x, p.y);
+        c.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: p.x, clientY: p.y, button: 0 }));
+        await sleep(rnd(300, 600));
+        if (sig() !== before) { changed = true; break; }
+      }
+      if (!changed) {
+        /* no move found: deal a new row from the stock */
+        const stockEl = [...w.el.querySelectorAll(".card")]
+          .find(c => (parseInt(c.style.top, 10) || 99) < 90 && (parseInt(c.style.left, 10) || 99) < 80);
+        if (stockEl) { await clickEl(stockEl); await sleep(rnd(700, 1200)); }
+        if (sig() === before) break;   /* stock empty and stuck — a very 1998 feeling */
       }
     }
     await sleep(rnd(800, 1400));
     await maybeClose(w);
   }
 
+  /* ---- WallBall (JezzBall rules): fire dividers away from the balls ---- */
   async function actWallball() {
     const w = await ghostLaunch("wallball", null, "WallBall");
     if (!w || w.closed) return;
     const cv = w.el.querySelector("canvas");
     if (!cv) { await maybeClose(w, 1); return; }
-    w.el.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
-    await sleep(300);
-    w.el.dispatchEvent(new KeyboardEvent("keyup", { key: " ", bubbles: true }));
-    const r = cv.getBoundingClientRect();
-    const sp = $("#screen").getBoundingClientRect();
-    for (let t = 0; t < 90; t++) {           /* sweep the paddle like a nervous person */
+    await sleep(rnd(800, 1400));
+    for (let shot = 0; shot < 8; shot++) {
       check();
-      const x = r.left + r.width / 2 + Math.sin(t / 7) * r.width * 0.38;
-      cv.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, clientX: x, clientY: r.bottom - 20 }));
-      cursorEl.style.left = (x - sp.left) + "px";
-      cursorEl.style.top = (r.bottom - 20 - sp.top) + "px";
-      cx = x - sp.left; cy = r.bottom - 20 - sp.top;
-      await sleep(90);
+      const st = w._wb && w._wb.state();
+      if (!st || st.state === "over") break;
+      const r = cv.getBoundingClientRect();
+      /* find the x farthest from every ball (a safe place to build a wall) */
+      let bestX = cv.width / 2, bestD = -1;
+      for (let x = cv.width * 0.15; x < cv.width * 0.85; x += cv.width / 12) {
+        const d = Math.min(...(st.balls || []).map(b => Math.abs(b.x - x)), 9999);
+        if (d > bestD) { bestD = d; bestX = x; }
+      }
+      const px = r.left + (bestX / cv.width) * r.width;
+      const py = r.top + r.height * rnd(0.35, 0.65);
+      const sp = $("#screen").getBoundingClientRect();
+      await moveTo(px - sp.left, py - sp.top);
+      cv.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, clientX: px, clientY: py, button: 0 }));
+      cv.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, clientX: px, clientY: py, button: 0 }));
+      cv.dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: px, clientY: py, button: 0 }));
+      await sleepReal(rnd(2200, 3800));    /* watch the wall grow, pray a little */
     }
+    await sleep(rnd(700, 1300));
+    await maybeClose(w);
+  }
+
+  /* ---- Worm: greedy pathing toward food, avoiding its own tail ---- */
+  async function actWorm() {
+    const w = await ghostLaunch("worm", null, "Worm");
+    if (!w || w.closed) return;
+    await sleep(rnd(600, 1000));
+    const DIRKEY = { "-1,0": "ArrowUp", "1,0": "ArrowDown", "0,-1": "ArrowLeft", "0,1": "ArrowRight" };
+    for (let t = 0; t < 180; t++) {
+      check();
+      const st = w._worm && w._worm.state();
+      if (!st || st.state === "over" || !st.snake || !st.snake.length) break;
+      const head = st.snake[0];
+      const body = new Set(st.snake.map(s2 => s2[0] + "," + s2[1]));
+      const GY = 26, GX = 40;                 /* the real board */
+      const rev = st.dir ? [-st.dir[0], -st.dir[1]] : null;
+      const cand = [];
+      for (const d of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+        if (rev && d[0] === rev[0] && d[1] === rev[1]) continue;   /* no 180s */
+        const ny = head[0] + d[0], nx = head[1] + d[1];
+        if (ny < 1 || nx < 1 || ny >= GY - 1 || nx >= GX - 1) continue;
+        if (body.has(ny + "," + nx)) continue;
+        const distF = st.food ? Math.abs(ny - st.food[0]) + Math.abs(nx - st.food[1]) : 0;
+        cand.push({ d, distF });
+      }
+      if (cand.length) {
+        /* penalize moves whose NEXT step would be a wall or the body */
+        for (const c of cand) {
+          const n2y = head[0] + c.d[0] * 2, n2x = head[1] + c.d[1] * 2;
+          if (n2y < 1 || n2x < 1 || n2y >= GY - 1 || n2x >= GX - 1 || body.has(n2y + "," + n2x)) c.distF += 60;
+        }
+        cand.sort((a, b) => a.distF - b.distF);
+        const chosen = cand[0];
+        const key = DIRKEY[chosen.d[0] + "," + chosen.d[1]];
+        if (key) await keyTap(w, key, 25);
+      }
+      await sleepReal(45);   /* out-think a 70ms snake */
+    }
+    await sleep(rnd(600, 1200));
     await maybeClose(w);
   }
 
   async function keyTap(w, key, holdMs) {
     w.el.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
-    await sleep(holdMs || rnd(70, 160));
+    await sleepReal(holdMs || rnd(70, 160));
     w.el.dispatchEvent(new KeyboardEvent("keyup", { key, bubbles: true }));
   }
 
@@ -791,19 +977,67 @@ W98.Autopilot = (() => {
     await maybeClose(w);
   }
 
+  /* ---- Stackz: score every rotation x column, then commit ---- */
   async function actStackz() {
     const w = await ghostLaunch("stackz", null, "Stackz");
     if (!w || w.closed) return;
     await sleep(rnd(600, 1000));
-    for (let i = 0; i < 10; i++) {
+    const stk = w._stk;
+    const rotOnce = (p) => p[0].map((_, c) => p.map(row => row[c]).reverse());
+    for (let block = 0; block < 9; block++) {
       check();
-      const moves = (Math.random() * 3) | 0;
-      for (let m = 0; m < moves; m++) await keyTap(w, Math.random() < 0.5 ? "ArrowLeft" : "ArrowRight");
-      if (Math.random() < 0.6) await keyTap(w, "ArrowUp");
-      await sleep(rnd(400, 900));
-      await keyTap(w, "ArrowDown", 400);     /* commit with confidence */
-      await sleep(rnd(500, 1000));
+      const st = stk && stk.state();
+      if (!st || st.state !== "play") break;
+      const H2 = st.grid.length, W2 = st.grid[0].length;
+      /* evaluate all rotations and columns of the current piece */
+      let best = null;
+      let shape = st.piece;
+      for (let r = 0; r < 4; r++) {
+        for (let x = -2; x < W2; x++) {
+          if (stk.collide(x, st.py, shape)) continue;
+          let y = st.py;
+          while (!stk.collide(x, y + 1, shape)) y++;
+          /* score the landing */
+          const g = st.grid.map(row => row.slice());
+          for (let sy = 0; sy < shape.length; sy++)
+            for (let sx = 0; sx < shape[sy].length; sx++)
+              if (shape[sy][sx] && g[y + sy] && g[y + sy][x + sx] !== undefined) g[y + sy][x + sx] = 1;
+          let lines = 0, holes = 0, aggH = 0;
+          for (let ry = 0; ry < H2; ry++) if (g[ry].every(v => v)) lines++;
+          for (let cx2 = 0; cx2 < W2; cx2++) {
+            let seen = false;
+            for (let ry = 0; ry < H2; ry++) {
+              if (g[ry][cx2]) { seen = true; aggH += (H2 - ry); break; }
+            }
+            for (let ry = 0; ry < H2; ry++) {
+              if (g[ry][cx2]) seen = true;
+              else if (seen && !g[ry][cx2]) holes++;
+            }
+          }
+          const score = lines * 100 - holes * 12 - aggH * 0.6 + y * 2;
+          if (!best || score > best.score) best = { rot: r, x, score };
+        }
+        shape = rotOnce(shape);
+      }
+      if (best) {
+        for (let r = 0; r < best.rot; r++) { await keyTap(w, "ArrowUp"); await sleep(rnd(120, 260)); }
+        const cur = stk.state();
+        let dx = best.x - cur.px;
+        while (dx !== 0) {
+          check();
+          await keyTap(w, dx > 0 ? "ArrowRight" : "ArrowLeft");
+          dx += dx > 0 ? -1 : 1;
+          await sleep(rnd(90, 190));
+        }
+        await sleep(rnd(200, 500));
+        await keyTap(w, " ");                       /* slam it down like you mean it */
+        await sleep(rnd(500, 900));
+      } else {
+        await keyTap(w, "ArrowDown", 300);
+        await sleep(600);
+      }
     }
+    await sleep(rnd(700, 1200));
     await maybeClose(w);
   }
 
@@ -942,16 +1176,36 @@ W98.Autopilot = (() => {
     await maybeClose(w, 0.9);
   }
 
+  /* ---- Powder Hill: actually dodge the trees, actually aim for ramps ---- */
   async function actSki() {
     const w = await ghostLaunch("ski", null, "Powder Hill");
     if (!w || w.closed) return;
     await sleep(rnd(700, 1200));
-    for (let i = 0; i < 14; i++) {
+    for (let t = 0; t < 110; t++) {
       check();
-      await keyTap(w, Math.random() < 0.5 ? "ArrowLeft" : "ArrowRight", rnd(150, 400));
-      if (Math.random() < 0.3) await keyTap(w, "ArrowDown", rnd(300, 700));   /* tuck! */
-      await sleep(rnd(400, 800));
+      const st = w._ski && w._ski.state();
+      if (!st || st.state === "over" || st.state === "eaten") break;
+      const px = st.player.x;
+      /* look downhill: obstacles approaching the skier's lane */
+      const ahead = st.objs.filter(o => o.y > 100 && o.y < 210 && /tree|rock|stump/.test(o.type));
+      const danger = ahead.filter(o => Math.abs(o.x - px) < 26);
+      const ramp = st.objs.find(o => o.type === "ramp" && o.y > 100 && o.y < 230 && Math.abs(o.x - px) < 60);
+      if (danger.length) {
+        /* steer toward the side with more open snow */
+        const leftBlock = ahead.filter(o => o.x < px && o.x > px - 80).length;
+        const rightBlock = ahead.filter(o => o.x > px && o.x < px + 80).length;
+        const key = leftBlock <= rightBlock && px > 40 ? "ArrowLeft" : "ArrowRight";
+        await keyTap(w, key, rnd(200, 380));
+      } else if (ramp) {
+        const key = ramp.x < px - 6 ? "ArrowLeft" : ramp.x > px + 6 ? "ArrowRight" : null;
+        if (key) await keyTap(w, key, rnd(120, 240));
+        else if (Math.random() < 0.4) await keyTap(w, "ArrowDown", rnd(250, 450));   /* tuck into it */
+      } else if (Math.random() < 0.25) {
+        await keyTap(w, "ArrowDown", rnd(300, 600));    /* clear snow: send it */
+      }
+      await sleepReal(160);
     }
+    await sleep(rnd(600, 1200));
     await maybeClose(w, 0.9);
   }
 

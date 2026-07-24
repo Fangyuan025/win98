@@ -460,6 +460,8 @@ W98.Apps.solitaire = {
     });
 
     deal();
+    /* read-only state for Autopilot's eyes (interaction stays in the UI) */
+    win._sol = { state: () => state };
     return win;
   }
 };
