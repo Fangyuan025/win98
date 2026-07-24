@@ -984,7 +984,7 @@ W98.Autopilot = (() => {
     await sleep(rnd(600, 1000));
     const stk = w._stk;
     const rotOnce = (p) => p[0].map((_, c) => p.map(row => row[c]).reverse());
-    for (let block = 0; block < 9; block++) {
+    for (let block = 0; block < 22; block++) {
       check();
       const st = stk && stk.state();
       if (!st || st.state !== "play") break;
@@ -1009,6 +1009,7 @@ W98.Autopilot = (() => {
             for (let ry = 0; ry < H2; ry++) {
               if (g[ry][cx2]) { seen = true; aggH += (H2 - ry); break; }
             }
+            seen = false;                       /* holes count from the top block down */
             for (let ry = 0; ry < H2; ry++) {
               if (g[ry][cx2]) seen = true;
               else if (seen && !g[ry][cx2]) holes++;
@@ -1020,16 +1021,15 @@ W98.Autopilot = (() => {
         shape = rotOnce(shape);
       }
       if (best) {
-        for (let r = 0; r < best.rot; r++) { await keyTap(w, "ArrowUp"); await sleep(rnd(120, 260)); }
+        for (let r = 0; r < best.rot; r++) { await keyTap(w, "ArrowUp", 25); await sleepReal(45); }
         const cur = stk.state();
         let dx = best.x - cur.px;
         while (dx !== 0) {
           check();
-          await keyTap(w, dx > 0 ? "ArrowRight" : "ArrowLeft");
+          await keyTap(w, dx > 0 ? "ArrowRight" : "ArrowLeft", 25);
           dx += dx > 0 ? -1 : 1;
-          await sleep(rnd(90, 190));
+          await sleepReal(45);
         }
-        await sleep(rnd(200, 500));
         await keyTap(w, " ");                       /* slam it down like you mean it */
         await sleep(rnd(500, 900));
       } else {
@@ -1209,8 +1209,145 @@ W98.Autopilot = (() => {
     await maybeClose(w, 0.9);
   }
 
+  /* ---- FreeCell: aces home, alternating runs, free cells as parking ---- */
+  async function actFreecell() {
+    const w = await ghostLaunch("freecell", null, "FreeCell");
+    if (!w || w.closed) return;
+    await sleep(rnd(700, 1200));
+    const fc = w._fc;
+    if (!fc) { await maybeClose(w, 1); return; }
+    const VN = ["", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+    const SU = ["♣", "♦", "♥", "♠"];
+    const face = (c) => VN[c.r] + SU[c.s];
+    const redS = (su) => su === 1 || su === 2;
+    const cardEl2 = (c) => [...w.el.querySelectorAll(".card")].find(e => e.textContent.indexOf(face(c)) >= 0);
+    const foundTotal = () => fc.state().found.reduce((a, p) => a + p.length, 0);
+    for (let mv = 0; mv < 34; mv++) {
+      check();
+      const st = fc.state();
+      const foundMax = {};
+      for (const pile of st.found) if (pile.length) { const t = pile[pile.length - 1]; foundMax[t.s] = t.r; }
+      const tails = st.cols.filter(c => c.length).map(c => c[c.length - 1]);
+      const frees = st.free.filter(Boolean);
+      /* 1. anything home-able → click card, then the matching foundation slot.
+         Every click re-renders the felt, so elements are re-queried each step. */
+      const home = [...tails, ...frees].find(c => c.r === (foundMax[c.s] || 0) + 1);
+      if (home) {
+        const ce = cardEl2(home);
+        if (ce) {
+          const before = foundTotal();
+          await clickEl(ce, "down");
+          await sleep(rnd(250, 500));
+          let ti = st.found.findIndex(p => p.length && p[p.length - 1].s === home.s);
+          if (ti < 0) ti = st.found.findIndex(p => !p.length);
+          const slot = w.el.querySelectorAll(".sol-slot.ace")[ti];
+          if (slot) { await clickEl(slot, "down"); await sleep(rnd(250, 450)); }
+          if (foundTotal() > before) continue;
+        }
+      }
+      /* 2. column-to-column: tail onto tail (descending, alternating color) */
+      let moved = false;
+      for (const c of tails) {
+        const dst = tails.find(d => d !== c && d.r === c.r + 1 && redS(d.s) !== redS(c.s));
+        if (!dst) continue;
+        const a = cardEl2(c);
+        if (!a) continue;
+        await clickEl(a, "down"); await sleep(rnd(250, 450));
+        const b = cardEl2(dst);                 /* re-find after the re-render */
+        if (b) { await clickEl(b, "down"); await sleep(rnd(300, 600)); moved = true; }
+        break;
+      }
+      if (moved) continue;
+      /* 2b. unpark: free-cell card that fits a column tail */
+      for (const c of frees) {
+        const dst = tails.find(d => d.r === c.r + 1 && redS(d.s) !== redS(c.s));
+        if (!dst) continue;
+        const a = cardEl2(c);
+        if (!a) continue;
+        await clickEl(a, "down"); await sleep(rnd(250, 450));
+        const b = cardEl2(dst);
+        if (b) { await clickEl(b, "down"); await sleep(rnd(300, 600)); moved = true; }
+        break;
+      }
+      if (moved) continue;
+      /* 2c. an empty column is a workbench: move a tail run onto it */
+      const emptyIdx = st.cols.findIndex(c => !c.length);
+      if (emptyIdx >= 0 && tails.length) {
+        const pick = tails.reduce((a, b) => (b.r > a.r ? b : a));
+        const a = cardEl2(pick);
+        if (a) {
+          await clickEl(a, "down"); await sleep(rnd(250, 450));
+          const base = w.el.querySelectorAll(".sol-slot")[8 + emptyIdx] ||
+            [...w.el.querySelectorAll(".sol-slot")].filter(sl => !sl.classList.contains("ace"))[emptyIdx];
+          if (base) { await clickEl(base, "down"); await sleep(rnd(300, 600)); continue; }
+        }
+      }
+      /* 3. park something in a free cell to unstick (keep 1 cell free) */
+      if (st.free.filter(f => !f).length > 1 && tails.length) {
+        const c = tails[(Math.random() * tails.length) | 0];
+        const ce = cardEl2(c);
+        if (ce) {
+          const p = screenPoint(ce);
+          await moveTo(p.x, p.y);
+          ce.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: p.x, clientY: p.y, button: 0 }));
+          await sleep(rnd(400, 700));
+          continue;
+        }
+      }
+      break;
+    }
+    await sleep(rnd(800, 1400));
+    await maybeClose(w);
+  }
+
+  /* ---- Hearts: dump the dangerous cards, then duck under every trick ---- */
+  async function actHearts() {
+    const w = await ghostLaunch("hearts", null, "Hearts");
+    if (!w || w.closed) return;
+    await sleep(rnd(900, 1500));
+    const hs = w._hearts;
+    if (!hs) { await maybeClose(w, 1); return; }
+    /* my hand is the bottom row of cards */
+    const handEls = () => [...w.el.querySelectorAll(".card")]
+      .filter(c => !c.classList.contains("facedown"))
+      .filter(c => { const r = c.getBoundingClientRect(); const wr = w.el.getBoundingClientRect(); return r.top > wr.top + wr.height * 0.6; })
+      .sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
+    /* pass phase: give away the three highest cards */
+    if (hs.state().phase === "pass") {
+      const hand = hs.state().hand || [];
+      const idxs = hand.map((c, i) => ({ i, v: c.r + (c.s === 3 && c.r >= 12 ? 10 : 0) }))
+        .sort((a, b) => b.v - a.v).slice(0, 3).map(o => o.i);
+      for (const i of idxs) {
+        const els = handEls();                  /* selection re-renders the hand */
+        if (els[i]) { await clickEl(els[i], "down"); await sleep(rnd(300, 600)); }
+      }
+      const pass = w.el.querySelector(".h-pass");
+      if (pass) { await clickEl(pass); await sleep(rnd(800, 1400)); }
+    }
+    /* play phase: when it's our turn, try cards lowest-first until one is accepted */
+    for (let round = 0; round < 40; round++) {
+      check();
+      const st = hs.state();
+      if (!st.hand || !st.hand.length) break;
+      if (st.phase === "play" && st.turn === 0) {
+        const order = st.hand.map((c, i) => ({ i, r: c.r })).sort((a, b) => a.r - b.r);
+        const before = st.hand.length;
+        for (const o of order) {
+          const els = handEls();
+          if (!els[o.i]) continue;
+          await clickEl(els[o.i], "down");
+          await sleep(rnd(350, 600));
+          if (hs.state().hand.length < before) break;   /* the engine accepted it */
+        }
+      }
+      await sleepReal(700);
+    }
+    await sleep(rnd(800, 1400));
+    await maybeClose(w);
+  }
+
   /* ================= the universal explorer: every other program ================= */
-  const GENERIC_APPS = ["magnifier", "osk", "clipbook", "addrbook", "freecell", "hearts",
+  const GENERIC_APPS = ["magnifier", "osk", "clipbook", "addrbook",
     "display", "datetime", "sounds", "themes", "mouse", "regional", "sysprops", "media",
     "cdplayer", "charmap", "slides", "megademo", "netmeet", "regedit", "deskpet",
     "calendar", "stickies", "surreal", "zipmaster", "spreadsheet", "netgrab", "defrag",
@@ -1287,6 +1424,8 @@ W98.Autopilot = (() => {
   const ACTIVITIES = [
     { id: "explore", w: 4, run: actExplore },
     { id: "solitaire", w: 2, run: actSolitaire },
+    { id: "freecell", w: 1, run: actFreecell },
+    { id: "hearts", w: 1, run: actHearts },
     { id: "spider", w: 1, run: actSpider },
     { id: "wallball", w: 1, run: actWallball },
     { id: "worm", w: 1, run: actWorm },

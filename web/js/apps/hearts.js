@@ -346,6 +346,7 @@ W98.Apps.hearts = {
     });
 
     newGame();
+    win._hearts = { state: () => ({ phase, turn, hand: hands && hands[0], passCount: passSel ? passSel.length : 0 }) };
     return win;
   }
 };

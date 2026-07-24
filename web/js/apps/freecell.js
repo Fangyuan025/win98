@@ -312,6 +312,7 @@ W98.Apps.freecell = {
     });
 
     deal(1 + ((Math.random() * 32000) | 0));
+    win._fc = { state: () => state };
     return win;
   }
 };
