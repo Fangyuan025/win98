@@ -790,8 +790,16 @@ W98.Autopilot = (() => {
     const rankOf = (c) => c.r || c.v;
     const face = (c) => VN[rankOf(c)] + SU[c.s];
     const isRedS = (su) => su === 1 || su === 2;
-    const findCardEl = (c) => [...w.el.querySelectorAll(".card")]
-      .find(e => !e.classList.contains("facedown") && e.textContent.indexOf(face(c)) >= 0);
+    const findCardEl = (c) => {
+      const aces = [...w.el.querySelectorAll(".sol-slot.ace")].map(sl => ({
+        x: parseInt(sl.style.left, 10) || 0, y: parseInt(sl.style.top, 10) || 0 }));
+      return [...w.el.querySelectorAll(".card")].find(e => {
+        if (e.classList.contains("facedown")) return false;
+        if (e.textContent.indexOf(face(c)) < 0) return false;
+        const ex = parseInt(e.style.left, 10) || 0, ey = parseInt(e.style.top, 10) || 0;
+        return !aces.some(a => Math.abs(a.x - ex) < 8 && Math.abs(a.y - ey) < 8);
+      });
+    };
     const S = () => w._sol && w._sol.state();
     /* progress = foundation cards, then flips, then cards built onto the tableau */
     const prog = (st) => {
@@ -807,8 +815,18 @@ W98.Autopilot = (() => {
       elc.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: p.x, clientY: p.y, button: 0 }));
       await sleep(rnd(350, 700));
     };
-    let passes = 0, progressThisPass = true;
-    for (let round = 0; round < 70; round++) {
+    let passes = 0, progressThisPass = true, games = 0, drawStreak = 0;
+    const br = (t) => { if (window.__solBr) window.__solBr.push(t); };
+    /* the human move: this deal is dead, shrug, deal again (once) */
+    const redeal = async () => {
+      if (games >= 1) return false;
+      games++; passes = 0; drawStreak = 0; progressThisPass = true;
+      br("F2");
+      await keyTap(w, "F2");
+      await sleep(rnd(900, 1500));
+      return true;
+    };
+    for (let round = 0; round < 90; round++) {
       check();
       const st = S();
       if (!st) break;
@@ -825,7 +843,7 @@ W98.Autopilot = (() => {
         const elc = findCardEl(homeC);
         if (elc) {
           await dbl(elc);
-          if (prog(S()) > before) { progressThisPass = true; continue; }
+          if (prog(S()) > before) { progressThisPass = true; drawStreak = 0; br("H"); continue; }
         }
       }
 
@@ -851,7 +869,7 @@ W98.Autopilot = (() => {
         const toEl = findCardEl(st.tab[dstCol][st.tab[dstCol].length - 1].c);
         if (!fromEl || !toEl) continue;
         await dragCard(fromEl, toEl);
-        if (prog(S()) > before) { acted = true; progressThisPass = true; }
+        if (prog(S()) > before) { acted = true; progressThisPass = true; drawStreak = 0; br("R"); }
         break;
       }
       if (acted) continue;
@@ -866,7 +884,7 @@ W98.Autopilot = (() => {
           const bases = [...w.el.querySelectorAll(".sol-slot:not(.ace)")].slice(1); /* [0] is the stock */
           if (fromEl && bases[emptyIdx]) {
             await dragCard(fromEl, bases[emptyIdx]);
-            if (prog(S()) > before) { progressThisPass = true; continue; }
+            if (prog(S()) > before) { progressThisPass = true; drawStreak = 0; br("K"); continue; }
           }
         }
       }
@@ -881,17 +899,30 @@ W98.Autopilot = (() => {
           const toEl = findCardEl(st.tab[dst][st.tab[dst].length - 1].c);
           if (fromEl && toEl) {
             await dragCard(fromEl, toEl);
-            if (prog(S()) > before) { progressThisPass = true; continue; }
+            if (prog(S()) > before) { progressThisPass = true; drawStreak = 0; br("W"); continue; }
           }
         }
       }
 
-      /* 5. draw from the stock; a full pass with no progress means the game is stuck */
-      if (!st.stock.length && !st.waste.length) break;
+      /* 5. omniscient shrug: if nothing buried in stock or waste can ever land
+         anywhere, this deal is unwinnable from here — stop grinding the deck */
+      const pool = [...st.stock, ...st.waste].map(e2 => e2.c || e2);
+      const anyPlayable =
+        pool.some(c => rankOf(c) === (foundMax[c.s] || 0) + 1) ||
+        pool.some(c => st.tab.some(col => col.length && col[col.length - 1].up &&
+          rankOf(col[col.length - 1].c) === rankOf(c) + 1 &&
+          isRedS(col[col.length - 1].c.s) !== isRedS(c.s))) ||
+        (emptyIdx >= 0 && pool.some(c => rankOf(c) === 13));
+      if (!anyPlayable && drawStreak >= 3) {
+        if (await redeal()) continue;
+        break;
+      }
+
+      /* 6. draw from the stock; a full pass with no progress means the game is stuck */
+      if (!st.stock.length && !st.waste.length) { if (await redeal()) continue; break; }
       if (!st.stock.length) {
-        if (!progressThisPass) break;
+        if (!progressThisPass || passes >= 2) { if (await redeal()) continue; break; }
         passes++; progressThisPass = false;
-        if (passes >= 4) break;
       }
       const slot = w.el.querySelector(".sol-slot");
       if (!slot) break;
@@ -900,6 +931,7 @@ W98.Autopilot = (() => {
         Math.abs((parseInt(c.style.left, 10) || 0) - sx) < 8 &&
         Math.abs((parseInt(c.style.top, 10) || 0) - sy) < 8);
       await clickEl(topCard || slot, "down");
+      drawStreak++; br("D");
       await sleep(rnd(450, 850));
     }
     await sleep(rnd(900, 1500));
