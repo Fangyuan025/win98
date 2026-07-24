@@ -658,39 +658,48 @@ W98.Autopilot = (() => {
     const w = await ghostLaunch("pinball", "Star Pilot Pinball", "Pinball");
     if (!w || w.closed) return;
     await sleep(rnd(600, 1100));
-    w.el.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
-    await sleepReal(rnd(380, 1000));   /* every pull different — every orbit different */
-    w.el.dispatchEvent(new KeyboardEvent("keyup", { key: " ", bubbles: true }));
+    /* hold the plunger until it is genuinely charged — a weak pull never
+       clears the top arc and the ball just sulks back into the lane */
+    const plunge = async () => {
+      const target = 12 + Math.random() * 4;      /* always enough, never identical */
+      w.el.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
+      for (let i = 0; i < 50; i++) {
+        await sleepReal(60);
+        const d = w._pb && w._pb.dbg ? w._pb.dbg() : null;
+        if (d && d.charge >= target) break;
+      }
+      w.el.dispatchEvent(new KeyboardEvent("keyup", { key: " ", bubbles: true }));
+    };
+    await plunge();
     let flips = 0, relaunches = 0;
-    for (let t = 0; t < 160; t++) {
+    for (let t = 0; t < 500; t++) {
       check();
       const pos = w._pb && w._pb.ballAt ? w._pb.ballAt() : null;
       if (pos) {
-        const [bx, by] = pos;
-        /* midfield crossing: stir the table for a livelier orbit */
-        if (by > 240 && by < 390 && bx < 315 && Math.random() < 0.35) {
-          await keyTap(w, Math.random() < 0.5 ? "z" : "/", 140);
-        }
-        /* ball dropping into the flipper zone → flip the correct side */
-        if (by > 395 && by < 505 && bx < 315) {
-          const k = bx < 160 ? "z" : "/";
-          await keyTap(w, k, 160);
+        const bx = pos[0], by = pos[1];
+        const vy = w._pb.dbg ? w._pb.dbg().vy : 0;
+        /* ball descending into the flipper zone -> bat it with the right side */
+        if (by > 380 && by < 505 && bx < 315 && vy > 0.4) {
+          const k = bx < 160 ? "z" : (bx > 195 ? "/" : (Math.random() < 0.5 ? "z" : "/"));
+          await keyTap(w, k, 200);
           flips++;
-          await sleep(300);
+          await sleepReal(110);
           continue;
         }
-        /* ball back at the plunger seat → launch again (up to 3 balls) */
-        if (bx > 315 && by > 430 && t > 20) {
+        /* midfield: an occasional stir keeps the orbit lively */
+        if (by > 240 && by < 380 && bx < 315 && Math.random() < 0.10) {
+          await keyTap(w, Math.random() < 0.5 ? "z" : "/", 130);
+        }
+        /* ball back at the plunger seat -> launch again */
+        if (bx > 315 && by > 430 && t > 12) {
           relaunches++;
-          if (relaunches > 3) break;
-          await sleepReal(600);
-          w.el.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
-          await sleepReal(rnd(350, 1000));
-          w.el.dispatchEvent(new KeyboardEvent("keyup", { key: " ", bubbles: true }));
-          await sleepReal(400);
+          if (relaunches > 4) break;
+          await sleepReal(500);
+          await plunge();
+          await sleepReal(300);
         }
       }
-      await sleepReal(110);
+      await sleepReal(45);
     }
     await sleep(rnd(600, 1200));
     await maybeClose(w, 0.85);
@@ -783,68 +792,115 @@ W98.Autopilot = (() => {
     const isRedS = (su) => su === 1 || su === 2;
     const findCardEl = (c) => [...w.el.querySelectorAll(".card")]
       .find(e => !e.classList.contains("facedown") && e.textContent.indexOf(face(c)) >= 0);
-    for (let round = 0; round < 24; round++) {
+    const S = () => w._sol && w._sol.state();
+    /* progress = foundation cards, then flips, then cards built onto the tableau */
+    const prog = (st) => {
+      if (!st) return -1;
+      let down = 0, tabN = 0, fnd = 0;
+      st.tab.forEach(col => col.forEach(e2 => { tabN++; if (!e2.up) down++; }));
+      st.found.forEach(p => { fnd += p.length; });
+      return fnd * 1000 + (28 - down) * 10 + tabN;
+    };
+    const dbl = async (elc) => {
+      const p = screenPoint(elc);
+      await moveTo(p.x, p.y);
+      elc.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: p.x, clientY: p.y, button: 0 }));
+      await sleep(rnd(350, 700));
+    };
+    let passes = 0, progressThisPass = true;
+    for (let round = 0; round < 70; round++) {
       check();
-      const st = w._sol && w._sol.state();
+      const st = S();
       if (!st) break;
+      const before = prog(st);
       const foundMax = {};
-      for (const pile of st.found) if (pile.length) {
-        const t0 = pile[pile.length - 1];
-        const t = t0.c || t0;
-        foundMax[t.s] = rankOf(t);
-      }
-      /* candidates: waste top + each tableau's face-up bottom card */
-      const cands = [];
-      if (st.waste.length) cands.push(st.waste[st.waste.length - 1].c || st.waste[st.waste.length - 1]);
-      for (const col of st.tab) if (col.length) { const e2 = col[col.length - 1]; if (e2.up) cands.push(e2.c); }
-      /* 1. send anything home */
-      const home = cands.find(c => rankOf(c) === (foundMax[c.s] || 0) + 1);
-      if (home) {
-        const elc = findCardEl(home);
+      st.found.forEach(p => { if (p.length) { const t = p[p.length - 1]; const c = t.c || t; foundMax[c.s] = rankOf(c); } });
+      const wasteTop = st.waste.length ? (st.waste[st.waste.length - 1].c || st.waste[st.waste.length - 1]) : null;
+      const tails = [];
+      st.tab.forEach(col => { if (col.length && col[col.length - 1].up) tails.push(col[col.length - 1].c); });
+
+      /* 1. anything home — tableau tails and the waste top, by double-click */
+      const homeC = [...tails, ...(wasteTop ? [wasteTop] : [])].find(c => rankOf(c) === (foundMax[c.s] || 0) + 1);
+      if (homeC) {
+        const elc = findCardEl(homeC);
         if (elc) {
-          const p = screenPoint(elc);
-          await moveTo(p.x, p.y);
-          elc.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: p.x, clientY: p.y, button: 0 }));
-          await sleep(rnd(400, 800));
-          continue;
+          await dbl(elc);
+          if (prog(S()) > before) { progressThisPass = true; continue; }
         }
       }
-      /* 2. move a run head onto another column (frees face-down cards) */
-      let moved = false;
-      for (let ci = 0; ci < st.tab.length && !moved; ci++) {
-        const col = st.tab[ci];
-        let head = -1;
-        for (let i = 0; i < col.length; i++) if (col[i].up) { head = i; break; }
-        if (head < 0) continue;
-        const hc = col[head].c;
-        for (let ti = 0; ti < st.tab.length; ti++) {
-          if (ti === ci) continue;
-          const dst = st.tab[ti];
-          if (!dst.length) { if (rankOf(hc) === 13 && head > 0) { /* king to empty */ } else continue; }
-          const dtop = dst.length ? dst[dst.length - 1] : null;
-          const dc = dtop && dtop.c;
-          if (!dst.length || (dtop.up && rankOf(dc) === rankOf(hc) + 1 && isRedS(dc.s) !== isRedS(hc.s))) {
-            const fromEl = findCardEl(hc);
-            const toEl = dst.length ? findCardEl(dc) : null;
-            if (fromEl && (toEl || !dst.length)) {
-              if (toEl) await dragCard(fromEl, toEl);
-              moved = true;
-              break;
-            }
+
+      /* first face-up card of each column — the head of the movable run */
+      const heads = [];
+      st.tab.forEach((col, ci) => {
+        for (let i = 0; i < col.length; i++) if (col[i].up) { heads.push({ ci, i, c: col[i].c }); return; }
+      });
+      const kingWaiting = heads.some(h => rankOf(h.c) === 13 && h.i > 0) ||
+        (wasteTop && rankOf(wasteTop) === 13);
+
+      /* 2. move a run only when it flips a card (or clears ground for a waiting king) */
+      let acted = false;
+      const byDepth = heads.slice().sort((a, b) => b.i - a.i);
+      for (const h of byDepth) {
+        if (h.i === 0 && !(kingWaiting && rankOf(h.c) !== 13)) continue;
+        const dstCol = st.tab.findIndex((col, ti) =>
+          ti !== h.ci && col.length && col[col.length - 1].up &&
+          rankOf(col[col.length - 1].c) === rankOf(h.c) + 1 &&
+          isRedS(col[col.length - 1].c.s) !== isRedS(h.c.s));
+        if (dstCol < 0) continue;
+        const fromEl = findCardEl(h.c);
+        const toEl = findCardEl(st.tab[dstCol][st.tab[dstCol].length - 1].c);
+        if (!fromEl || !toEl) continue;
+        await dragCard(fromEl, toEl);
+        if (prog(S()) > before) { acted = true; progressThisPass = true; }
+        break;
+      }
+      if (acted) continue;
+
+      /* 3. a king (with a flip underneath, or from the waste) claims an empty column */
+      const emptyIdx = st.tab.findIndex(col => !col.length);
+      if (emptyIdx >= 0) {
+        const kingH = heads.find(h => rankOf(h.c) === 13 && h.i > 0);
+        const kc = kingH ? kingH.c : (wasteTop && rankOf(wasteTop) === 13 ? wasteTop : null);
+        if (kc) {
+          const fromEl = findCardEl(kc);
+          const bases = [...w.el.querySelectorAll(".sol-slot:not(.ace)")].slice(1); /* [0] is the stock */
+          if (fromEl && bases[emptyIdx]) {
+            await dragCard(fromEl, bases[emptyIdx]);
+            if (prog(S()) > before) { progressThisPass = true; continue; }
           }
         }
       }
-      if (moved) { await sleep(rnd(300, 700)); continue; }
-      /* 3. draw from the stock — the clickable thing is the card ON the slot */
-      const slot = w.el.querySelector(".sol-slot");
-      if (slot) {
-        const sx = parseInt(slot.style.left, 10) || 8, sy = parseInt(slot.style.top, 10) || 8;
-        const topCard = [...w.el.querySelectorAll(".card")].find(c =>
-          Math.abs((parseInt(c.style.left, 10) || 0) - sx) < 8 &&
-          Math.abs((parseInt(c.style.top, 10) || 0) - sy) < 8);
-        await clickEl(topCard || slot, "down");
-        await sleep(rnd(500, 900));
+
+      /* 4. waste top onto a tableau tail */
+      if (wasteTop) {
+        const dst = st.tab.findIndex(col => col.length && col[col.length - 1].up &&
+          rankOf(col[col.length - 1].c) === rankOf(wasteTop) + 1 &&
+          isRedS(col[col.length - 1].c.s) !== isRedS(wasteTop.s));
+        if (dst >= 0) {
+          const fromEl = findCardEl(wasteTop);
+          const toEl = findCardEl(st.tab[dst][st.tab[dst].length - 1].c);
+          if (fromEl && toEl) {
+            await dragCard(fromEl, toEl);
+            if (prog(S()) > before) { progressThisPass = true; continue; }
+          }
+        }
       }
+
+      /* 5. draw from the stock; a full pass with no progress means the game is stuck */
+      if (!st.stock.length && !st.waste.length) break;
+      if (!st.stock.length) {
+        if (!progressThisPass) break;
+        passes++; progressThisPass = false;
+        if (passes >= 4) break;
+      }
+      const slot = w.el.querySelector(".sol-slot");
+      if (!slot) break;
+      const sx = parseInt(slot.style.left, 10) || 8, sy = parseInt(slot.style.top, 10) || 8;
+      const topCard = [...w.el.querySelectorAll(".card")].find(c =>
+        Math.abs((parseInt(c.style.left, 10) || 0) - sx) < 8 &&
+        Math.abs((parseInt(c.style.top, 10) || 0) - sy) < 8);
+      await clickEl(topCard || slot, "down");
+      await sleep(rnd(450, 850));
     }
     await sleep(rnd(900, 1500));
     await maybeClose(w);
@@ -916,64 +972,53 @@ W98.Autopilot = (() => {
     await maybeClose(w);
   }
 
-  /* ---- Worm: greedy pathing toward food, avoiding its own tail ---- */
-  async function actWorm() {
-    const w = await ghostLaunch("worm", null, "Worm");
-    if (!w || w.closed) return;
-    await sleep(rnd(600, 1000));
-    const DIRKEY = { "-1,0": "ArrowUp", "1,0": "ArrowDown", "0,-1": "ArrowLeft", "0,1": "ArrowRight" };
-    for (let t = 0; t < 180; t++) {
-      check();
-      const st = w._worm && w._worm.state();
-      if (!st || st.state === "over" || !st.snake || !st.snake.length) break;
-      const head = st.snake[0];
-      const body = new Set(st.snake.map(s2 => s2[0] + "," + s2[1]));
-      const GY = 26, GX = 40;                 /* the real board */
-      const rev = st.dir ? [-st.dir[0], -st.dir[1]] : null;
-      const cand = [];
-      for (const d of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
-        if (rev && d[0] === rev[0] && d[1] === rev[1]) continue;   /* no 180s */
-        const ny = head[0] + d[0], nx = head[1] + d[1];
-        if (ny < 1 || nx < 1 || ny >= GY - 1 || nx >= GX - 1) continue;
-        if (body.has(ny + "," + nx)) continue;
-        const distF = st.food ? Math.abs(ny - st.food[0]) + Math.abs(nx - st.food[1]) : 0;
-        cand.push({ d, distF });
-      }
-      if (cand.length) {
-        /* penalize moves whose NEXT step would be a wall or the body */
-        for (const c of cand) {
-          const n2y = head[0] + c.d[0] * 2, n2x = head[1] + c.d[1] * 2;
-          if (n2y < 1 || n2x < 1 || n2y >= GY - 1 || n2x >= GX - 1 || body.has(n2y + "," + n2x)) c.distF += 60;
-        }
-        cand.sort((a, b) => a.distF - b.distF);
-        const chosen = cand[0];
-        const key = DIRKEY[chosen.d[0] + "," + chosen.d[1]];
-        if (key) await keyTap(w, key, 25);
-      }
-      await sleepReal(45);   /* out-think a 70ms snake */
-    }
-    await sleep(rnd(600, 1200));
-    await maybeClose(w);
-  }
-
   async function keyTap(w, key, holdMs) {
     w.el.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
     await sleepReal(holdMs || rnd(70, 160));
     w.el.dispatchEvent(new KeyboardEvent("keyup", { key, bubbles: true }));
   }
 
+  /* ---- Worm: greedy pathing toward food, avoiding its own tail ---- */
   async function actWorm() {
     const w = await ghostLaunch("worm", null, "Worm");
     if (!w || w.closed) return;
     await sleep(rnd(600, 1000));
-    const DIRS = ["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"];
-    let d = 0;
-    for (let i = 0; i < 22; i++) {           /* circle strategy: brave and wrong */
+    const wm = w._worm;
+    if (!wm) { await maybeClose(w, 1); return; }
+    const KEY = { "0,1": "ArrowRight", "0,-1": "ArrowLeft", "1,0": "ArrowDown", "-1,0": "ArrowUp" };
+    const CH = 26, CW = 40;
+    const safe = (st, r, c2) => r > 0 && c2 > 0 && r < CH - 1 && c2 < CW - 1 &&
+      !st.snake.some(sg => sg[0] === r && sg[1] === c2);
+    /* one decision per game tick — detected by the head actually moving */
+    let lastHead = "", eats = 0, foodSig = wm.state().food.join(",");
+    for (let i = 0; i < 900; i++) {
       check();
-      if (i % 4 === 3) d = (d + 1) % 4;
-      await keyTap(w, DIRS[d]);
-      await sleep(rnd(350, 650));
+      const st = wm.state();
+      if (st.state !== "play") break;
+      const f2 = st.food.join(",");
+      if (f2 !== foodSig) { foodSig = f2; eats++; if (eats >= 5) break; }
+      const headK = st.snake[0].join(",");
+      if (headK !== lastHead) {
+        lastHead = headK;
+        const hr = st.snake[0][0], hc = st.snake[0][1];
+        const dirs = [[0, 1], [0, -1], [1, 0], [-1, 0]]
+          .filter(d => !(d[0] === -st.dir[0] && d[1] === -st.dir[1]))
+          .filter(d => safe(st, hr + d[0], hc + d[1]))
+          .filter(d => {                                /* keep an exit open */
+            const nr = hr + d[0], nc = hc + d[1];
+            return [[0, 1], [0, -1], [1, 0], [-1, 0]].some(e2 =>
+              !(e2[0] === -d[0] && e2[1] === -d[1]) && safe(st, nr + e2[0], nc + e2[1]));
+          })
+          .sort((a, b) =>
+            (Math.abs(hr + a[0] - st.food[0]) + Math.abs(hc + a[1] - st.food[1])) -
+            (Math.abs(hr + b[0] - st.food[0]) + Math.abs(hc + b[1] - st.food[1])));
+        if (dirs.length && (dirs[0][0] !== st.dir[0] || dirs[0][1] !== st.dir[1])) {
+          w.el.dispatchEvent(new KeyboardEvent("keydown", { key: KEY[dirs[0].join(",")], bubbles: true }));
+        }
+      }
+      await sleepReal(28);
     }
+    await sleep(rnd(700, 1200));
     await maybeClose(w);
   }
 

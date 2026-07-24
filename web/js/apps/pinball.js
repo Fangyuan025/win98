@@ -52,9 +52,9 @@ W98.Apps.pinball = {
       [LANE_X, 400, 228, 468], [228, 468, FR.px + 2, FR.py - 4] // right funnel → flipper
     ];
     const BUMPERS = [
-      { x: 110, y: 165, r: 22, col: "#e04040", pts: 150 },
-      { x: 205, y: 135, r: 22, col: "#40c040", pts: 150 },
-      { x: 168, y: 232, r: 22, col: "#e0a020", pts: 150 },
+      { x: 140, y: 170, r: 22, col: "#e04040", pts: 150 },
+      { x: 243, y: 128, r: 22, col: "#40c040", pts: 150 },
+      { x: 205, y: 215, r: 22, col: "#e0a020", pts: 150 },
       { x: 70, y: 380, r: 13, col: "#3080e0", pts: 50 },
       { x: 250, y: 380, r: 13, col: "#3080e0", pts: 50 }
     ];
