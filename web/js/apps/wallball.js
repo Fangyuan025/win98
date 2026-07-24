@@ -246,7 +246,7 @@ W98.Apps.wallball = {
       lastT = now;
       for (let i = 0; i < steps; i++) step();
     }, 22);
-    win._wb = { state: () => ({ grid, balls, state }) };
+    win._wb = { state: () => ({ grid, balls, state, level, lives, pct: pct() }) };
     return win;
   }
 };

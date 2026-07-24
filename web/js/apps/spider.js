@@ -216,7 +216,7 @@ W98.Apps = W98.Apps || {};
       win.el.addEventListener("keydown", (e) => { if (e.key === "F2") { e.preventDefault(); deal(); } });
       win.ctxMenu = () => [{ label: "New Game", accel: "F2", click: deal }];
       win.opts.onResize = () => paint();
-      win._spider = { state: () => ({ done, moves, score, stock: stock.length, cols: cols.map(c => c.length) }), tryMove, dealRow, deal };
+      win._spider = { state: () => ({ done, moves, score, stock: stock.length, cols: cols.map(c => c.length), colsFull: cols.map(c => c.map(x => ({ v: x.v, up: !!x.up }))) }), tryMove, dealRow, deal };
       deal();
       return win;
     }

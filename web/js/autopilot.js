@@ -819,14 +819,14 @@ W98.Autopilot = (() => {
     const br = (t) => { if (window.__solBr) window.__solBr.push(t); };
     /* the human move: this deal is dead, shrug, deal again (once) */
     const redeal = async () => {
-      if (games >= 1) return false;
+      if (games >= 2) return false;
       games++; passes = 0; drawStreak = 0; progressThisPass = true;
       br("F2");
       await keyTap(w, "F2");
       await sleep(rnd(900, 1500));
       return true;
     };
-    for (let round = 0; round < 90; round++) {
+    for (let round = 0; round < 130; round++) {
       check();
       const st = S();
       if (!st) break;
@@ -939,66 +939,133 @@ W98.Autopilot = (() => {
   }
 
   /* ---- Spider: BOB double-clicks runs (the game auto-picks the best home) ---- */
+  /* ---- Spider: plan real runs (flips first), deal rows when stuck ---- */
   async function actSpider() {
     const w = await ghostLaunch("spider", null, "Spider");
     if (!w || w.closed) return;
     await sleep(rnd(700, 1200));
-    const sig = () => w._spider ? w._spider.state().cols.join(",") : "";
-    for (let mv = 0; mv < 8; mv++) {
+    const sp = w._spider;
+    if (!sp || !sp.state().colsFull) { await maybeClose(w, 1); return; }
+    /* a legal pick: cards idx..end all face-up and descending by exactly 1 */
+    const runFrom = (col, idx) => {
+      for (let i = idx; i < col.length; i++) {
+        if (!col[i].up) return false;
+        if (i > idx && col[i].v !== col[i - 1].v - 1) return false;
+      }
+      return true;
+    };
+    const seen = new Set();          /* never repeat an exact move between deals */
+    for (let mv = 0; mv < 260; mv++) {
       check();
-      const before = sig();
-      /* try up-cards from the tallest columns first — more likely to free a flip */
-      const ups = [...w.el.querySelectorAll(".card")]
-        .filter(c => !c.classList.contains("facedown") && (parseInt(c.style.top, 10) || 0) > 90)
-        .sort((a, b) => (parseInt(b.style.top, 10) || 0) - (parseInt(a.style.top, 10) || 0));
-      let changed = false;
-      for (let i = 0; i < Math.min(6, ups.length); i++) {
-        const c = ups[i];
-        if (!c.isConnected) continue;
-        const p = screenPoint(c);
-        await moveTo(p.x, p.y);
-        c.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: p.x, clientY: p.y, button: 0 }));
-        await sleep(rnd(300, 600));
-        if (sig() !== before) { changed = true; break; }
+      const st = sp.state();
+      if (st.done >= 1) break;                     /* a full K-to-A run banked */
+      const cols = st.colsFull;
+      let best = null;
+      for (let ci = 0; ci < cols.length; ci++) {
+        const col = cols[ci];
+        for (let idx = 0; idx < col.length; idx++) {
+          if (!col[idx].up || !runFrom(col, idx)) continue;
+          for (let ti = 0; ti < cols.length; ti++) {
+            if (ti === ci) continue;
+            const dst = cols[ti];
+            if (dst.length && dst[dst.length - 1].v !== col[idx].v + 1) continue;
+            if (!dst.length && idx === 0) continue;          /* pointless shuffle */
+            const key = ci + ":" + idx + ">" + ti;
+            if (seen.has(key)) continue;
+            const flip = idx > 0 && !col[idx - 1].up;
+            const joins = dst.length > 0;
+            const runLen2 = col.length - idx;
+            const scoreM = (flip ? 100 : 0) + (joins ? 20 + runLen2 * 2 : 4) +
+              (idx === 0 ? -6 : 0);
+            if (!best || scoreM > best.scoreM) best = { ci, idx, ti, scoreM, key };
+          }
+        }
       }
-      if (!changed) {
-        /* no move found: deal a new row from the stock */
-        const stockEl = [...w.el.querySelectorAll(".card")]
-          .find(c => (parseInt(c.style.top, 10) || 99) < 90 && (parseInt(c.style.left, 10) || 99) < 80);
-        if (stockEl) { await clickEl(stockEl); await sleep(rnd(700, 1200)); }
-        if (sig() === before) break;   /* stock empty and stuck — a very 1998 feeling */
+      if (best) {
+        /* gesture at the column, then let the table's own move logic take it */
+        const cardEls = [...w.el.querySelectorAll(".card")];
+        const anchor = cardEls[Math.min(cardEls.length - 1, best.ci * 5)];
+        if (anchor) { const p = screenPoint(anchor); await moveTo(p.x + rnd(-20, 20), p.y + rnd(-10, 10)); }
+        sp.tryMove(best.ci, best.idx, best.ti);
+        seen.add(best.key);
+        await sleep(rnd(250, 550));
+        continue;
       }
+      const st2 = sp.state();
+      if (st2.stock > 0 && st2.cols.every(n => n > 0)) {
+        sp.dealRow();
+        seen.clear();                              /* a new row changes everything */
+        await sleep(rnd(600, 1100));
+        continue;
+      }
+      break;
     }
     await sleep(rnd(800, 1400));
     await maybeClose(w);
   }
 
   /* ---- WallBall (JezzBall rules): fire dividers away from the balls ---- */
+  /* ---- WallBall: squeeze the atoms — cut just outside the swarm, advance ---- */
   async function actWallball() {
     const w = await ghostLaunch("wallball", null, "WallBall");
     if (!w || w.closed) return;
     const cv = w.el.querySelector("canvas");
     if (!cv) { await maybeClose(w, 1); return; }
     await sleep(rnd(800, 1400));
-    for (let shot = 0; shot < 8; shot++) {
-      check();
-      const st = w._wb && w._wb.state();
-      if (!st || st.state === "over") break;
+    const startLevel = w._wb ? w._wb.state().level : 1;
+    let vertical = true, retried = false;
+    const clickAt = async (fx, fy, right) => {
       const r = cv.getBoundingClientRect();
-      /* find the x farthest from every ball (a safe place to build a wall) */
-      let bestX = cv.width / 2, bestD = -1;
-      for (let x = cv.width * 0.15; x < cv.width * 0.85; x += cv.width / 12) {
-        const d = Math.min(...(st.balls || []).map(b => Math.abs(b.x - x)), 9999);
-        if (d > bestD) { bestD = d; bestX = x; }
-      }
-      const px = r.left + (bestX / cv.width) * r.width;
-      const py = r.top + r.height * rnd(0.35, 0.65);
+      const px = r.left + fx * r.width / cv.width;
+      const py = r.top + fy * r.height / cv.height;
       const sp = $("#screen").getBoundingClientRect();
       await moveTo(px - sp.left, py - sp.top);
-      cv.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, clientX: px, clientY: py, button: 0 }));
-      cv.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, clientX: px, clientY: py, button: 0 }));
-      cv.dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: px, clientY: py, button: 0 }));
-      await sleepReal(rnd(2200, 3800));    /* watch the wall grow, pray a little */
+      if (right) {
+        cv.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: px, clientY: py, button: 2 }));
+      } else {
+        cv.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, clientX: px, clientY: py, button: 0 }));
+        cv.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, clientX: px, clientY: py, button: 0 }));
+        cv.dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: px, clientY: py, button: 0 }));
+      }
+    };
+    for (let shot = 0; shot < 40; shot++) {
+      check();
+      const st = w._wb && w._wb.state();
+      if (!st) break;
+      if (st.level > startLevel) break;            /* level cleared — mission done */
+      if (st.state === "over") {                   /* the atoms won — one rematch */
+        if (retried) break;
+        retried = true;
+        await dismissStrays();
+        await keyTap(w, "F2");
+        await sleep(rnd(700, 1200));
+        continue;
+      }
+      const next = [...w.el.ownerDocument.querySelectorAll(".msgbox-btns .btn")]
+        .find(b => /Next Level/i.test(b.textContent));
+      if (next) { await clickEl(next); await sleep(rnd(700, 1200)); continue; }
+      const balls = st.balls || [];
+      if (!balls.length) { await sleepReal(800); continue; }
+      const xs = balls.map(b => b.x), ys = balls.map(b => b.y);
+      const minX2 = Math.min(...xs), maxX2 = Math.max(...xs);
+      const minY2 = Math.min(...ys), maxY2 = Math.max(...ys);
+      const leftGap = minX2, rightGap = cv.width - maxX2;
+      const topGap = minY2, botGap = cv.height - maxY2;
+      /* cut just outside the swarm on the roomiest side; flip orientation as needed */
+      const bestV = Math.max(leftGap, rightGap), bestH = Math.max(topGap, botGap);
+      let fx, fy, wantVert;
+      if (bestV >= bestH) {
+        wantVert = true;
+        fx = leftGap >= rightGap ? Math.max(12, minX2 - 26) : Math.min(cv.width - 12, maxX2 + 26);
+        fy = cv.height * rnd(0.3, 0.7);
+      } else {
+        wantVert = false;
+        fy = topGap >= botGap ? Math.max(12, minY2 - 26) : Math.min(cv.height - 12, maxY2 + 26);
+        fx = cv.width * rnd(0.3, 0.7);
+      }
+      if (wantVert !== vertical) { await clickAt(fx, fy, true); vertical = wantVert; await sleep(rnd(200, 400)); }
+      await clickAt(fx, fy, false);
+      await sleepReal(rnd(1500, 2200));    /* watch the wall grow, pray a little */
     }
     await sleep(rnd(700, 1300));
     await maybeClose(w);
@@ -1022,13 +1089,24 @@ W98.Autopilot = (() => {
     const safe = (st, r, c2) => r > 0 && c2 > 0 && r < CH - 1 && c2 < CW - 1 &&
       !st.snake.some(sg => sg[0] === r && sg[1] === c2);
     /* one decision per game tick — detected by the head actually moving */
-    let lastHead = "", eats = 0, foodSig = wm.state().food.join(",");
-    for (let i = 0; i < 900; i++) {
+    let lastHead = "", eats = 0, foodSig = wm.state().food.join(","), lives = 0;
+    for (let i = 0; i < 2200; i++) {
       check();
       const st = wm.state();
+      if (st.state === "over") {                   /* splat. dust off, go again */
+        if (lives >= 3 || eats >= 4) break;
+        lives++; eats = 0;
+        await sleep(rnd(700, 1200));
+        await dismissStrays();
+        await keyTap(w, "F2");
+        await sleep(rnd(500, 900));
+        foodSig = wm.state().food.join(",");
+        lastHead = "";
+        continue;
+      }
       if (st.state !== "play") break;
       const f2 = st.food.join(",");
-      if (f2 !== foodSig) { foodSig = f2; eats++; if (eats >= 5) break; }
+      if (f2 !== foodSig) { foodSig = f2; eats++; if (eats >= 6) break; }
       const headK = st.snake[0].join(",");
       if (headK !== lastHead) {
         lastHead = headK;
@@ -1061,7 +1139,14 @@ W98.Autopilot = (() => {
     await sleep(rnd(600, 1000));
     const stk = w._stk;
     const rotOnce = (p) => p[0].map((_, c) => p.map(row => row[c]).reverse());
-    for (let block = 0; block < 22; block++) {
+    let boards = 0;
+    for (let block = 0; block < 32; block++) {
+      if (block === 31 && boards < 1 && stk && stk.state().lines < 4 && stk.state().state === "play") {
+        boards++; block = -1;                       /* cold board — deal again */
+        await keyTap(w, "F2");
+        await sleep(rnd(700, 1200));
+        continue;
+      }
       check();
       const st = stk && stk.state();
       if (!st || st.state !== "play") break;
@@ -1118,17 +1203,88 @@ W98.Autopilot = (() => {
     await maybeClose(w);
   }
 
+  /* ---- Corridor: BFS through the maze to the goo, then zap it ---- */
   async function actCorridor() {
     const w = await ghostLaunch("corridor", null, "CORRIDOR");
     if (!w || w.closed) return;
     await sleep(rnd(900, 1500));
-    for (let i = 0; i < 4; i++) {
+    const fps = w._fps;
+    if (!fps || !fps.map) { await maybeClose(w, 0.9); return; }
+    const norm = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
+    const walkable = (m, x, y) => { const c = m[y] && m[y][x]; return c !== undefined && c !== "#" && c !== "=" && c !== "%"; };
+    /* a straight ray across the grid: BOB only shoots what he can actually see */
+    const canSee = (m, x1, y1, x2, y2) => {
+      const d = Math.hypot(x2 - x1, y2 - y1), steps = Math.ceil(d / 0.15);
+      for (let i = 1; i < steps; i++) {
+        const t = i / steps;
+        if (!walkable(m, (x1 + (x2 - x1) * t) | 0, (y1 + (y2 - y1) * t) | 0)) return false;
+      }
+      return true;
+    };
+    /* BFS from the player cell to the target cell; returns the next cell to enter */
+    const pathTo = (m, sx, sy, tx, ty) => {
+      const key = (x, y) => x + "," + y;
+      const prev = new Map([[key(sx, sy), null]]);
+      const q = [[sx, sy]];
+      while (q.length) {
+        const [cx2, cy2] = q.shift();
+        if (cx2 === tx && cy2 === ty) {
+          let cur = [tx, ty], back = null, len = 0;
+          while (prev.get(key(cur[0], cur[1]))) { back = cur; cur = prev.get(key(cur[0], cur[1])); len++; }
+          return { next: back, len };
+        }
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nx = cx2 + dx, ny = cy2 + dy;
+          if (!walkable(m, nx, ny) || prev.has(key(nx, ny))) continue;
+          prev.set(key(nx, ny), [cx2, cy2]);
+          q.push([nx, ny]);
+        }
+      }
+      return { next: null, len: 999 };
+    };
+    const aimAndSettle = async (want) => {
+      for (let t = 0; t < 6; t++) {
+        const d2 = norm(want - fps.state().ang);
+        if (Math.abs(d2) < 0.06) return;
+        const k = d2 > 0 ? "ArrowRight" : "ArrowLeft";
+        fps.key(k, true);
+        await sleepReal(Math.min(500, Math.max(35, Math.abs(d2) / 0.055 * 33)));
+        fps.key(k, false);
+        await sleepReal(50);
+      }
+    };
+    let lastKills = 0, stuckShots = 0;
+    for (let i = 0; i < 160; i++) {
       check();
-      await keyTap(w, "w", rnd(900, 1600));           /* stride forward */
-      await keyTap(w, Math.random() < 0.5 ? "ArrowLeft" : "ArrowRight", rnd(200, 450));
-      await keyTap(w, " ");                            /* zap at nothing in particular */
-      await sleep(rnd(400, 800));
+      const st = fps.state();
+      if (st.over || st.won || st.kills >= 2 || st.hp < 22 || st.ammo <= 0) break;
+      if (!st.foes || !st.foes.length) break;      /* floor cleared */
+      const m = fps.map();
+      const foe = st.foes.reduce((a, b) =>
+        Math.hypot(a.x - st.px, a.y - st.py) < Math.hypot(b.x - st.px, b.y - st.py) ? a : b);
+      const dist = Math.hypot(foe.x - st.px, foe.y - st.py);
+      const route = pathTo(m, st.px | 0, st.py | 0, foe.x | 0, foe.y | 0);
+      if (dist < 5 && canSee(m, st.px, st.py, foe.x, foe.y) && stuckShots < 5) {
+        await aimAndSettle(Math.atan2(foe.y - st.py, foe.x - st.px));
+        await keyTap(w, " ", 50);
+        await sleepReal(rnd(150, 240));
+        await keyTap(w, " ", 50);
+        await sleepReal(rnd(150, 240));
+        const now = fps.state().kills;
+        if (now > lastKills) { lastKills = now; stuckShots = 0; }
+        else stuckShots++;
+        continue;
+      }
+      if (!route.next) { stuckShots = 0; await sleepReal(300); continue; }
+      const want = Math.atan2((route.next[1] + 0.5) - st.py, (route.next[0] + 0.5) - st.px);
+      await aimAndSettle(want);
+      fps.key("w", true);
+      await sleepReal(rnd(320, 480));              /* ~one cell of travel */
+      fps.key("w", false);
+      stuckShots = 0;
     }
+    fps.key("w", false);
+    await sleep(rnd(500, 1000));
     await maybeClose(w, 0.9);
   }
 
@@ -1286,7 +1442,7 @@ W98.Autopilot = (() => {
     await maybeClose(w, 0.9);
   }
 
-  /* ---- FreeCell: aces home, alternating runs, free cells as parking ---- */
+  /* ---- FreeCell: a one-move planner — simulate every legal move, take the best ---- */
   async function actFreecell() {
     const w = await ghostLaunch("freecell", null, "FreeCell");
     if (!w || w.closed) return;
@@ -1298,80 +1454,117 @@ W98.Autopilot = (() => {
     const face = (c) => VN[c.r] + SU[c.s];
     const redS = (su) => su === 1 || su === 2;
     const cardEl2 = (c) => [...w.el.querySelectorAll(".card")].find(e => e.textContent.indexOf(face(c)) >= 0);
-    const foundTotal = () => fc.state().found.reduce((a, p) => a + p.length, 0);
-    for (let mv = 0; mv < 34; mv++) {
+    const clone = (st) => JSON.parse(JSON.stringify(st));
+    const foundTotal = (st) => st.found.reduce((a, p) => a + p.length, 0);
+    /* the whole point of FreeCell: how buried is the next card each suit needs */
+    const score = (st) => {
+      let sc = foundTotal(st) * 1000;
+      sc += st.free.filter(f => !f).length * 22;
+      sc += st.cols.filter(c => !c.length).length * 44;
+      const fm = {};
+      st.found.forEach(p => { if (p.length) { const t = p[p.length - 1]; fm[t.s] = t.r; } });
+      for (let su = 0; su < 4; su++) {
+        const need = (fm[su] || 0) + 1;
+        if (need > 13) continue;
+        for (const col of st.cols) {
+          const at = col.findIndex(c => c.s === su && c.r === need);
+          if (at >= 0) sc -= (col.length - 1 - at) * 28;
+        }
+      }
+      /* tidy tails: descending alternating pairs are future-proof */
+      for (const col of st.cols)
+        for (let i = 1; i < col.length; i++)
+          if (col[i].r === col[i - 1].r - 1 && redS(col[i].s) !== redS(col[i - 1].s)) sc += 3;
+      return sc;
+    };
+    const legalMoves = (st) => {
+      const fm = {};
+      st.found.forEach(p => { if (p.length) { const t = p[p.length - 1]; fm[t.s] = t.r; } });
+      const out = [];
+      const tails = st.cols.map(c => c.length ? c[c.length - 1] : null);
+      const sources = [];
+      tails.forEach((c, i) => { if (c) sources.push({ c, from: "col", i }); });
+      st.free.forEach((c, i) => { if (c) sources.push({ c, from: "free", i }); });
+      for (const sMv of sources) {
+        if (sMv.c.r === (fm[sMv.c.s] || 0) + 1) out.push({ ...sMv, to: "found" });
+        tails.forEach((d, ti) => {
+          if (ti === sMv.i && sMv.from === "col") return;
+          if (d ? (d.r === sMv.c.r + 1 && redS(d.s) !== redS(sMv.c.s)) : sMv.from === "col")
+            out.push({ ...sMv, to: "col", ti });
+        });
+        if (sMv.from === "col" && st.free.some(f => !f)) out.push({ ...sMv, to: "free" });
+      }
+      return out;
+    };
+    const apply = (st, mv) => {
+      const c = mv.from === "col" ? st.cols[mv.i].pop() : st.free[mv.i];
+      if (mv.from === "free") st.free[mv.i] = null;
+      if (mv.to === "found") {
+        const pile = st.found.find(p => p.length && p[p.length - 1].s === c.s) ||
+          st.found.find(p => !p.length);
+        pile.push(c);
+      } else if (mv.to === "col") st.cols[mv.ti].push(c);
+      else st.free[st.free.findIndex(f => !f)] = c;
+      return st;
+    };
+    const seenSig = new Set();
+    let deals = 0;
+    for (let mvN = 0; mvN < 150; mvN++) {
       check();
       const st = fc.state();
-      const foundMax = {};
-      for (const pile of st.found) if (pile.length) { const t = pile[pile.length - 1]; foundMax[t.s] = t.r; }
-      const tails = st.cols.filter(c => c.length).map(c => c[c.length - 1]);
-      const frees = st.free.filter(Boolean);
-      /* 1. anything home-able → click card, then the matching foundation slot.
-         Every click re-renders the felt, so elements are re-queried each step. */
-      const home = [...tails, ...frees].find(c => c.r === (foundMax[c.s] || 0) + 1);
-      if (home) {
-        const ce = cardEl2(home);
-        if (ce) {
-          const before = foundTotal();
-          await clickEl(ce, "down");
-          await sleep(rnd(250, 500));
-          let ti = st.found.findIndex(p => p.length && p[p.length - 1].s === home.s);
-          if (ti < 0) ti = st.found.findIndex(p => !p.length);
-          const slot = w.el.querySelectorAll(".sol-slot.ace")[ti];
-          if (slot) { await clickEl(slot, "down"); await sleep(rnd(250, 450)); }
-          if (foundTotal() > before) continue;
+      const sig = JSON.stringify([st.free, st.cols]);
+      seenSig.add(sig);
+      const base = score(st);
+      const cands = [];
+      for (const mv of legalMoves(st)) {
+        const st2 = apply(clone(st), mv);
+        const s2 = JSON.stringify([st2.free, st2.cols]);
+        if (seenSig.has(s2)) continue;             /* no going in circles */
+        cands.push({ mv, st2, sc: score(st2) });
+      }
+      cands.sort((a, b) => b.sc - a.sc);
+      let best = null;
+      for (const cand of cands.slice(0, 6)) {      /* peek one move further */
+        let follow = cand.sc;
+        for (const mv2 of legalMoves(cand.st2)) {
+          const sc3 = score(apply(clone(cand.st2), mv2));
+          if (sc3 > follow) follow = sc3;
         }
+        const total = cand.sc * 0.55 + follow * 0.45;
+        if (!best || total > best.total) best = { mv: cand.mv, sc: cand.sc, total };
       }
-      /* 2. column-to-column: tail onto tail (descending, alternating color) */
-      let moved = false;
-      for (const c of tails) {
-        const dst = tails.find(d => d !== c && d.r === c.r + 1 && redS(d.s) !== redS(c.s));
-        if (!dst) continue;
-        const a = cardEl2(c);
-        if (!a) continue;
-        await clickEl(a, "down"); await sleep(rnd(250, 450));
-        const b = cardEl2(dst);                 /* re-find after the re-render */
-        if (b) { await clickEl(b, "down"); await sleep(rnd(300, 600)); moved = true; }
-        break;
-      }
-      if (moved) continue;
-      /* 2b. unpark: free-cell card that fits a column tail */
-      for (const c of frees) {
-        const dst = tails.find(d => d.r === c.r + 1 && redS(d.s) !== redS(c.s));
-        if (!dst) continue;
-        const a = cardEl2(c);
-        if (!a) continue;
-        await clickEl(a, "down"); await sleep(rnd(250, 450));
-        const b = cardEl2(dst);
-        if (b) { await clickEl(b, "down"); await sleep(rnd(300, 600)); moved = true; }
-        break;
-      }
-      if (moved) continue;
-      /* 2c. an empty column is a workbench: move a tail run onto it */
-      const emptyIdx = st.cols.findIndex(c => !c.length);
-      if (emptyIdx >= 0 && tails.length) {
-        const pick = tails.reduce((a, b) => (b.r > a.r ? b : a));
-        const a = cardEl2(pick);
-        if (a) {
-          await clickEl(a, "down"); await sleep(rnd(250, 450));
-          const base = w.el.querySelectorAll(".sol-slot")[8 + emptyIdx] ||
-            [...w.el.querySelectorAll(".sol-slot")].filter(sl => !sl.classList.contains("ace"))[emptyIdx];
-          if (base) { await clickEl(base, "down"); await sleep(rnd(300, 600)); continue; }
-        }
-      }
-      /* 3. park something in a free cell to unstick (keep 1 cell free) */
-      if (st.free.filter(f => !f).length > 1 && tails.length) {
-        const c = tails[(Math.random() * tails.length) | 0];
-        const ce = cardEl2(c);
-        if (ce) {
-          const p = screenPoint(ce);
-          await moveTo(p.x, p.y);
-          ce.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: p.x, clientY: p.y, button: 0 }));
-          await sleep(rnd(400, 700));
+      if (!best || best.sc < base - 60) {          /* out of useful moves */
+        if (deals < 2 && foundTotal(st) < 8) {     /* weak board — shrug, redeal */
+          deals++; seenSig.clear();
+          await keyTap(w, "F2");
+          await sleep(rnd(900, 1500));
           continue;
         }
+        break;
       }
-      break;
+      const mv = best.mv;
+      const el1 = cardEl2(mv.c);
+      if (!el1) break;
+      if (mv.to === "found") {
+        const before = foundTotal(st);
+        await clickEl(el1, "down"); await sleep(rnd(220, 420));
+        let ti = st.found.findIndex(p => p.length && p[p.length - 1].s === mv.c.s);
+        if (ti < 0) ti = st.found.findIndex(p => !p.length);
+        const slot = w.el.querySelectorAll(".sol-slot.ace")[ti];
+        if (slot) { await clickEl(slot, "down"); await sleep(rnd(220, 420)); }
+        if (foundTotal(fc.state()) === before) break;
+      } else if (mv.to === "col") {
+        await clickEl(el1, "down"); await sleep(rnd(220, 420));
+        const dstCol = fc.state().cols[mv.ti];
+        const target = dstCol.length ? cardEl2(dstCol[dstCol.length - 1]) :
+          w.el.querySelectorAll(".sol-slot")[8 + mv.ti];
+        if (target) { await clickEl(target, "down"); await sleep(rnd(250, 480)); }
+      } else {                                     /* to a free cell */
+        const p = screenPoint(el1);
+        await moveTo(p.x, p.y);
+        el1.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: p.x, clientY: p.y, button: 0 }));
+        await sleep(rnd(300, 550));
+      }
     }
     await sleep(rnd(800, 1400));
     await maybeClose(w);
@@ -1402,10 +1595,10 @@ W98.Autopilot = (() => {
       if (pass) { await clickEl(pass); await sleep(rnd(800, 1400)); }
     }
     /* play phase: when it's our turn, try cards lowest-first until one is accepted */
-    for (let round = 0; round < 40; round++) {
+    for (let round = 0; round < 140; round++) {
       check();
       const st = hs.state();
-      if (!st.hand || !st.hand.length) break;
+      if (!st.hand || !st.hand.length) break;      /* the whole hand played out */
       if (st.phase === "play" && st.turn === 0) {
         const order = st.hand.map((c, i) => ({ i, r: c.r })).sort((a, b) => a.r - b.r);
         const before = st.hand.length;

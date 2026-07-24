@@ -375,6 +375,7 @@ W98.Apps.minesweeper = {
     });
 
     newGame();
+    win._mine = { state: () => ({ won, dead }) };
     return win;
   }
 };

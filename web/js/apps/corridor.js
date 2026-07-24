@@ -501,7 +501,8 @@ W98.Apps = W98.Apps || {};
 
       /* regression hook */
       win._fps = {
-        state: () => ({ px: px2, py: py2, hp, ammo, level, kills, enemies: enemies.filter(e2 => e2.hp > 0).length, over, won }),
+        map: () => map.map(r => r.join("")),
+        state: () => ({ px: px2, py: py2, ang, hp, ammo, level, kills, enemies: enemies.filter(e2 => e2.hp > 0).length, foes: enemies.filter(e2 => e2.hp > 0).map(e2 => ({ x: e2.x, y: e2.y })), over, won }),
         warp: (nx, ny) => { px2 = nx; py2 = ny; },
         turn: (a) => { ang = a; },
         shoot,

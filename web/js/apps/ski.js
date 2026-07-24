@@ -260,7 +260,7 @@ W98.Apps.ski = {
       for (let i = 0; i < steps; i++) step();
     }, 30);
     setTimeout(() => win.el.focus(), 80);
-    win._ski = { state: () => ({ player, objs, state, monster }) };
+    win._ski = { state: () => ({ player, objs, state, monster, dist, score }) };
     return win;
   }
 };
