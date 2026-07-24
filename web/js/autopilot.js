@@ -705,6 +705,310 @@ W98.Autopilot = (() => {
     await maybeClose(w, 0.9);
   }
 
+  /* ================= expert skills, wave 3 ================= */
+
+  async function actSolitaire() {
+    const w = await ghostLaunch("solitaire", "Solitaire", "Solitaire");
+    if (!w || w.closed) return;
+    await sleep(rnd(700, 1200));
+    for (let i = 0; i < 5; i++) {
+      check();
+      const stock = w.el.querySelector(".sol-slot");
+      if (stock) await clickEl(stock);
+      await sleep(rnd(500, 1100));
+      /* try to send something home */
+      const ups = [...w.el.querySelectorAll(".card")].filter(c => !c.classList.contains("facedown")).slice(-8);
+      if (ups.length && Math.random() < 0.7) {
+        const c = pick(ups);
+        const p = screenPoint(c);
+        await moveTo(p.x, p.y);
+        c.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: p.x, clientY: p.y, button: 0 }));
+        await sleep(rnd(400, 900));
+      }
+    }
+    await sleep(rnd(800, 1500));
+    await maybeClose(w);
+  }
+
+  async function actSpider() {
+    const w = await ghostLaunch("spider", null, "Spider");
+    if (!w || w.closed) return;
+    await sleep(rnd(700, 1200));
+    for (let i = 0; i < 4; i++) {
+      check();
+      const cards = [...w.el.querySelectorAll(".card")].filter(c => !c.classList.contains("facedown"));
+      if (cards.length) {
+        await clickEl(pick(cards));            /* pick a run... */
+        await sleep(rnd(400, 800));
+        await clickEl(pick(cards));            /* ...and a destination; the game judges us */
+        await sleep(rnd(500, 1000));
+      }
+    }
+    await sleep(rnd(800, 1400));
+    await maybeClose(w);
+  }
+
+  async function actWallball() {
+    const w = await ghostLaunch("wallball", null, "WallBall");
+    if (!w || w.closed) return;
+    const cv = w.el.querySelector("canvas");
+    if (!cv) { await maybeClose(w, 1); return; }
+    w.el.dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
+    await sleep(300);
+    w.el.dispatchEvent(new KeyboardEvent("keyup", { key: " ", bubbles: true }));
+    const r = cv.getBoundingClientRect();
+    const sp = $("#screen").getBoundingClientRect();
+    for (let t = 0; t < 90; t++) {           /* sweep the paddle like a nervous person */
+      check();
+      const x = r.left + r.width / 2 + Math.sin(t / 7) * r.width * 0.38;
+      cv.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, clientX: x, clientY: r.bottom - 20 }));
+      cursorEl.style.left = (x - sp.left) + "px";
+      cursorEl.style.top = (r.bottom - 20 - sp.top) + "px";
+      cx = x - sp.left; cy = r.bottom - 20 - sp.top;
+      await sleep(90);
+    }
+    await maybeClose(w);
+  }
+
+  async function keyTap(w, key, holdMs) {
+    w.el.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+    await sleep(holdMs || rnd(70, 160));
+    w.el.dispatchEvent(new KeyboardEvent("keyup", { key, bubbles: true }));
+  }
+
+  async function actWorm() {
+    const w = await ghostLaunch("worm", null, "Worm");
+    if (!w || w.closed) return;
+    await sleep(rnd(600, 1000));
+    const DIRS = ["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"];
+    let d = 0;
+    for (let i = 0; i < 22; i++) {           /* circle strategy: brave and wrong */
+      check();
+      if (i % 4 === 3) d = (d + 1) % 4;
+      await keyTap(w, DIRS[d]);
+      await sleep(rnd(350, 650));
+    }
+    await maybeClose(w);
+  }
+
+  async function actStackz() {
+    const w = await ghostLaunch("stackz", null, "Stackz");
+    if (!w || w.closed) return;
+    await sleep(rnd(600, 1000));
+    for (let i = 0; i < 10; i++) {
+      check();
+      const moves = (Math.random() * 3) | 0;
+      for (let m = 0; m < moves; m++) await keyTap(w, Math.random() < 0.5 ? "ArrowLeft" : "ArrowRight");
+      if (Math.random() < 0.6) await keyTap(w, "ArrowUp");
+      await sleep(rnd(400, 900));
+      await keyTap(w, "ArrowDown", 400);     /* commit with confidence */
+      await sleep(rnd(500, 1000));
+    }
+    await maybeClose(w);
+  }
+
+  async function actCorridor() {
+    const w = await ghostLaunch("corridor", null, "CORRIDOR");
+    if (!w || w.closed) return;
+    await sleep(rnd(900, 1500));
+    for (let i = 0; i < 4; i++) {
+      check();
+      await keyTap(w, "w", rnd(900, 1600));           /* stride forward */
+      await keyTap(w, Math.random() < 0.5 ? "ArrowLeft" : "ArrowRight", rnd(200, 450));
+      await keyTap(w, " ");                            /* zap at nothing in particular */
+      await sleep(rnd(400, 800));
+    }
+    await maybeClose(w, 0.9);
+  }
+
+  async function actTV() {
+    const w = await ghostLaunch("tv98", null, "TV98");
+    if (!w || w.closed) return;
+    await sleep(rnd(500, 900));
+    const power = [...w.el.querySelectorAll("button")].find(b => b.textContent.trim() === "⏻");
+    if (power && w._tv && !w._tv.power()) { await clickEl(power); await sleep(rnd(1200, 2000)); }
+    const chans = [...w.el.querySelectorAll("button")].filter(b => /^(CH|[0-9+▲▼-]{1,3})$/.test(b.textContent.trim()));
+    for (let i = 0; i < 3; i++) {
+      check();
+      if (chans.length) await clickEl(pick(chans));
+      await sleep(rnd(3000, 6000));          /* channel surfing, the national sport */
+    }
+    if (power && w._tv && w._tv.power()) await clickEl(power);   /* off when done */
+    await sleep(400);
+    await maybeClose(w, 0.9);
+  }
+
+  async function actComposer() {
+    const w = await ghostLaunch("composer", null, "Composer");
+    if (!w || w.closed) return;
+    await sleep(rnd(700, 1200));
+    const cv = w.el.querySelector("canvas");
+    if (cv) {
+      const r = cv.getBoundingClientRect();
+      for (let i = 0; i < 6; i++) {          /* place notes with intent, if not talent */
+        check();
+        const x = r.left + r.width * (0.1 + 0.8 * (i / 6) + rnd(0, 0.08));
+        const y = r.top + r.height * rnd(0.15, 0.85);
+        const sp = $("#screen").getBoundingClientRect();
+        await moveTo(x - sp.left, y - sp.top);
+        cv.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, clientX: x, clientY: y, button: 0 }));
+        cv.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, clientX: x, clientY: y, button: 0 }));
+        await sleep(rnd(250, 600));
+      }
+    }
+    const play = [...w.el.querySelectorAll("button")].find(b => /▶/.test(b.textContent));
+    if (play) { await clickEl(play); await sleep(rnd(4000, 7000)); }
+    const stopB = [...w.el.querySelectorAll("button")].find(b => /■|Stop/.test(b.textContent));
+    if (stopB) await clickEl(stopB);
+    await maybeClose(w, 0.9);
+  }
+
+  async function actPhotogoo() {
+    const w = await ghostLaunch("photogoo", null, "PhotoGoo");
+    if (!w || w.closed) return;
+    await sleep(rnd(700, 1200));
+    const cv = w.el.querySelector("canvas");
+    if (!cv) { await maybeClose(w, 1); return; }
+    const r = cv.getBoundingClientRect();
+    const sp = $("#screen").getBoundingClientRect();
+    for (let g = 0; g < 3; g++) {
+      check();
+      let x = r.left + r.width * rnd(0.25, 0.75), y = r.top + r.height * rnd(0.3, 0.7);
+      await moveTo(x - sp.left, y - sp.top);
+      cv.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, clientX: x, clientY: y, button: 0 }));
+      for (let i = 0; i < 14; i++) {
+        x += rnd(-10, 10); y += rnd(-8, 8);
+        cv.dispatchEvent(new MouseEvent("mousemove", { bubbles: true, clientX: x, clientY: y }));
+        cursorEl.style.left = (x - sp.left) + "px"; cursorEl.style.top = (y - sp.top) + "px";
+        await sleep(30);
+      }
+      cv.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, clientX: x, clientY: y }));
+      await sleep(rnd(400, 900));
+    }
+    await sleep(rnd(800, 1500));   /* admire the damage */
+    await maybeClose(w);
+  }
+
+  async function actSndrec() {
+    const w = await ghostLaunch("sndrec", null, "Sound Recorder");
+    if (!w || w.closed) return;
+    await sleep(rnd(500, 900));
+    const btn = (t) => [...w.el.querySelectorAll("button")].find(b => b.textContent.trim() === t);
+    const rec = btn("⏺");
+    if (rec) {
+      await clickEl(rec);                       /* try to record; 1998 says no */
+      await sleep(600);
+      await dismissStrays();                    /* "no recording device" — acknowledged */
+    }
+    const play = btn("▶");
+    if (play) { await clickEl(play); await sleep(rnd(1500, 2500)); }
+    await maybeClose(w, 0.9);
+  }
+
+  async function actPal() {
+    const w = await ghostLaunch("pal", null, "Pal");
+    if (!w || w.closed) return;
+    await sleep(rnd(800, 1400));
+    const inp = w.el.querySelector("input.field");
+    const send = [...w.el.querySelectorAll("button")].find(b => /Send/.test(b.textContent));
+    if (inp && send) {
+      await clickEl(inp);
+      await typeInto(inp, pick(["hey, is netgrab down for you too?", "did you beat my minesweeper time yet", "a/s/l? just kidding. homework?"]));
+      await clickEl(send);
+      await sleep(rnd(3500, 6000));            /* wait for the reply, read it */
+    }
+    await maybeClose(w, 0.8);
+  }
+
+  async function actBBS() {
+    const w = await ghostLaunch("hyperterm", null, "HyperTerminal");
+    if (!w || w.closed) return;
+    await sleep(rnd(600, 1000));
+    /* File > Connect through the real menu */
+    const fileM = [...w.el.querySelectorAll(".menubar > span")].find(m => /File|檔案/.test(m.textContent));
+    if (fileM) {
+      fileM.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+      await sleep(rnd(400, 700));
+      const item = [...document.querySelectorAll(".menu-pop .menu-item")].find(r => /Connect/.test(r.textContent));
+      if (item) { await clickEl(item); item.dispatchEvent(new MouseEvent("mouseup", { bubbles: true })); }
+    }
+    await sleep(4200);                          /* the 28.8k handshake, savored */
+    for (const k of ["m", "1", "q", "g"]) {
+      check();
+      await keyTap(w, k);
+      await sleep(k === "1" ? rnd(3500, 5500) : rnd(1200, 2200));   /* read the boards */
+    }
+    await sleep(rnd(800, 1400));
+    await maybeClose(w, 0.9);
+  }
+
+  async function actSki() {
+    const w = await ghostLaunch("ski", null, "Powder Hill");
+    if (!w || w.closed) return;
+    await sleep(rnd(700, 1200));
+    for (let i = 0; i < 14; i++) {
+      check();
+      await keyTap(w, Math.random() < 0.5 ? "ArrowLeft" : "ArrowRight", rnd(150, 400));
+      if (Math.random() < 0.3) await keyTap(w, "ArrowDown", rnd(300, 700));   /* tuck! */
+      await sleep(rnd(400, 800));
+    }
+    await maybeClose(w, 0.9);
+  }
+
+  /* ================= the universal explorer: every other program ================= */
+  const GENERIC_APPS = ["magnifier", "osk", "clipbook", "addrbook", "freecell", "hearts",
+    "display", "datetime", "sounds", "themes", "mouse", "regional", "sysprops", "media",
+    "cdplayer", "charmap", "slides", "megademo", "netmeet", "regedit", "deskpet",
+    "calendar", "stickies", "surreal", "zipmaster", "spreadsheet", "netgrab", "defrag",
+    "vscan", "scandisk", "pagecrafter", "sysmon", "writer", "chatterbox", "dialer", "run", "find", "help"];
+  const DANGER_BTN = /delete|remove|clear|format|empty|uninstall|reset|purge|清除|移除|刪除/i;
+  let lastGeneric = "";
+
+  async function exploreApp(appId) {
+    check();
+    const before = WM.wins.filter(x => !x.closed).length;
+    W98.launch(appId);
+    await sleep(rnd(900, 1500));
+    await handleDialPrompt();                   /* net-gated apps get dialed for */
+    const w = WM.wins.filter(x => !x.closed && !x.opts.noTaskbar).slice(-1)[0];
+    if (!w || WM.wins.filter(x => !x.closed).length <= before && !w) return;
+    await sleep(rnd(1000, 2000));               /* look around first */
+    /* poke a tab */
+    const tabs = [...w.el.querySelectorAll(".tab, [class*=tab-btn]")];
+    if (tabs.length > 1) { await clickEl(tabs[1]); await sleep(rnd(800, 1500)); }
+    /* click one safe button */
+    const safeBtns = [...w.el.querySelectorAll("button.btn")].filter(b => {
+      const t = b.textContent.trim();
+      return t && t.length < 22 && !DANGER_BTN.test(t) && !/OK|Cancel|Close|關閉|取消|確定/.test(t) && !b.closest(".titlebar");
+    });
+    if (safeBtns.length && Math.random() < 0.8) { await clickEl(pick(safeBtns)); await sleep(rnd(700, 1400)); await dismissStrays(); }
+    /* select a list row */
+    const rows = [...w.el.querySelectorAll(".tree > div, .lv-bigitem, tbody tr")].slice(0, 12);
+    if (rows.length) { await clickEl(pick(rows), "down"); await sleep(rnd(800, 1500)); }
+    /* nudge a slider */
+    const slider = w.el.querySelector("input[type=range]");
+    if (slider) {
+      const v = Number(slider.min || 0) + (Number(slider.max || 100) - Number(slider.min || 0)) * rnd(0.3, 0.7);
+      slider.value = String(Math.round(v));
+      slider.dispatchEvent(new Event("input", { bubbles: true }));
+      await sleep(rnd(500, 1000));
+    }
+    /* scroll something */
+    const scroller = [...w.el.querySelectorAll("div")].find(d => d.scrollHeight > d.clientHeight + 60);
+    if (scroller) { for (let i = 0; i < 2; i++) { scroller.scrollTop += rnd(60, 160); await sleep(rnd(600, 1200)); } }
+    await sleep(rnd(1200, 2400));
+    if (w && !w.closed) await maybeClose(w, 0.85);
+    await dismissStrays();
+  }
+
+  async function actExplore() {
+    const pool = GENERIC_APPS.filter(a => a !== lastGeneric && W98.Apps[a]);
+    const appId = pick(pool);
+    lastGeneric = appId;
+    trace("explore " + appId);
+    await exploreApp(appId);
+  }
+
   async function actIdle() {
     /* coffee. staring. the 1998 default state. */
     for (let i = 0; i < 4; i++) {
@@ -727,6 +1031,20 @@ W98.Autopilot = (() => {
   }
 
   const ACTIVITIES = [
+    { id: "explore", w: 4, run: actExplore },
+    { id: "solitaire", w: 2, run: actSolitaire },
+    { id: "spider", w: 1, run: actSpider },
+    { id: "wallball", w: 1, run: actWallball },
+    { id: "worm", w: 1, run: actWorm },
+    { id: "stackz", w: 2, run: actStackz },
+    { id: "corridor", w: 1, run: actCorridor },
+    { id: "tv", w: 2, run: actTV },
+    { id: "composer", w: 1, run: actComposer },
+    { id: "photogoo", w: 1, run: actPhotogoo },
+    { id: "sndrec", w: 1, run: actSndrec },
+    { id: "palchat", w: 2, run: actPal },
+    { id: "bbs", w: 1, run: actBBS },
+    { id: "ski", w: 2, run: actSki },
     { id: "diary", w: 3, run: actDiary },
     { id: "mine", w: 3, run: actMinesweeper },
     { id: "browse", w: 3, run: actBrowse },
@@ -855,6 +1173,16 @@ W98.Autopilot = (() => {
 
   return { start, stop, confirmStart, get active() { return active; }, _trace: TRACE,
     _act: (id) => { const a = ACTIVITIES.find(x => x.id === id); return a && a.run(); },
+    /* probe: run the universal explorer against one app (testing) */
+    _probe: async (appId, fast) => {
+      if (active) return "busy";
+      active = true; turbo = !!fast; cx = 400; cy = 300;
+      makeCursor();
+      try { await exploreApp(appId); }
+      catch (e) { if (e !== STOP) { turbo = false; stop(false); throw e; } }
+      finally { turbo = false; stop(false); }
+      return "ok";
+    },
     /* marathon test: n random activities through the real loop machinery */
     _marathon: async (n, fast) => {
       if (active) return "already active";
