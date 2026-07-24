@@ -1,7 +1,9 @@
-/* mediaplayer.js — Media Player 98: streaming video from the future,
-   in a window that believes it is Windows Media Player 6.4.
-   YouTube / Bilibili / Vimeo / Dailymotion play through their official
-   embed players inside the 98 chrome. */
+/* mediaplayer.js — Media Player 98: video from the future, in a window that
+   believes it is Windows Media Player 6.4. YouTube / Bilibili / Vimeo /
+   Dailymotion play through their official embed players inside the 98 chrome
+   (dial-up required); local files play offline — drag one in from the Mac or
+   use File > Open — with a hand-drawn 98 transport bar and a fullscreen that
+   falls back to maximize when the shell says no. */
 "use strict";
 W98.Apps = W98.Apps || {};
 (() => {

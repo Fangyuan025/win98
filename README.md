@@ -37,6 +37,8 @@ dependencies — the whole OS is hand-written HTML/CSS/JS inside a Swift + WKWeb
 | **Software** | Office suite, WordPad with a cat assistant, spreadsheet with live formulas, Paint, PhotoGoo warping toy, Composer 98 step sequencer, MegaAmp, SurrealPlayer (it rebuffers, always), print pipeline with a spooler and one perpetually jammed printer |
 | **Games** | Minesweeper, Solitaire, FreeCell, Hearts, pinball with multiball, a ski game with a hungry legend, **CORRIDOR 98** (a software-rendered raycasting FPS), Stackz, and DOS-mode SNAKE, GORILLA, and a working QBasic interpreter |
 | **Claude Desktop 98** | An AI assistant back-ported 27 years: launches programs, does math, reads and writes real files, searches the tiny web, and streams replies at a proud 28.8k |
+| **Autopilot 98** | Hand the machine to BOB, a ghost user with a drifting cursor and 29 expert skills. He wins Minesweeper by deduction, banks Spider runs, plans FreeCell two moves deep, clears Stackz lines, hunts the Corridor goo by pathfinding — and writes letters with typos he then regrets. Press ESC to take the computer back |
+| **1998 happens to you** | Pure-chance era events: chain letters arrive, a popup declares you the 1,000,000th visitor, someone picks up the phone mid-download, Windows finds hardware that does not exist, and — rarely, honestly — a blue screen. An improper shutdown earns you ScanDisk at boot |
 | **Languages** | Full English and Traditional Chinese UI — menus, dialogs, Help library, encyclopedia and the assistant. Switch in Control Panel → Regional Settings |
 
 ## Nice details
@@ -56,9 +58,19 @@ dependencies — the whole OS is hand-written HTML/CSS/JS inside a Swift + WKWeb
 | Path | What |
 |---|---|
 | `native/main.swift` | AppKit shell: WKWebView, localhost server, web-fetch/render bridge, persistence, export panel |
-| `web/js/` | The operating system — window manager, VFS, 67 apps, i18n layer |
-| `web/js/apps/` | One file per program |
+| `web/js/` | The operating system — window manager, VFS, i18n layer, BOB (`autopilot.js`), era events (`events.js`) |
+| `web/js/apps/` | One file per program, 67 of them |
+| `devserver.py` | Dev loop: serves `web/` at `localhost:8098` for browser iteration |
 | `build.sh` | Compiles and signs `Windows 98.app` (ad hoc) |
+| `docs/MODDING.md` | How to write and add your own programs |
+
+## Make your own programs
+
+Every program is one dependency-free file, and adding one is an afternoon
+project: register on `W98.Apps`, build a window with `WM.create()`, add a
+Start-menu line, draw a 32×32 icon on canvas — and optionally teach BOB to
+use it. The full walkthrough (with a complete pasteable example app) is in
+**[docs/MODDING.md](docs/MODDING.md)**.
 
 ---
 
@@ -93,6 +105,8 @@ open "Windows 98.app"
 | **軟體** | Office 套件、有貓咪助手的 WordPad、即時公式試算表、小畫家、照片捏捏樂、作曲家 98 音序器、MegaAmp、SurrealPlayer（它一定會重新緩衝）、含佇列與一台永遠卡紙印表機的列印管線 |
 | **遊戲** | 踩地雷、接龍、新接龍、傷心小棧、有多球模式的彈珠台、有飢餓傳說的滑雪遊戲、**走廊 98**（軟體渲染的光線投射 FPS）、疊疊樂，以及 DOS 模式的 SNAKE、GORILLA 和真的能寫程式的 QBasic |
 | **Claude 桌面版 98** | 被移植回 27 年前的 AI 助手：啟動程式、算數學、讀寫真實檔案、搜尋小小網路，並以引以為傲的 28.8k 速度串流回覆 |
+| **託管 98** | 把電腦交給幽靈使用者 BOB：游標帶著人味飄移，身懷 29 項專家技能 — 用真推理贏踩地雷、蜘蛛接龍收整套、新接龍算兩步、疊疊樂消行、用尋路演算法獵走廊 98 的黏液怪 — 還會打錯字然後懊悔地退格。按 ESC 隨時拿回電腦 |
+| **1998 會找上你** | 純機率時代事件：連鎖信寄達、彈窗宣布你是第 1,000,000 位訪客、下載到一半有人拿起電話、Windows 找到不存在的硬體，還有 — 很少、但誠實地 — 藍畫面。不正常關機，開機就是 ScanDisk |
 | **語言** | 完整的英文與繁體中文介面 — 選單、對話方塊、說明文件庫、百科全書與助手。在 控制台 → 地區設定 切換 |
 
 ## 講究的細節
@@ -111,9 +125,18 @@ open "Windows 98.app"
 | 路徑 | 內容 |
 |---|---|
 | `native/main.swift` | AppKit 外殼：WKWebView、localhost 伺服器、網頁抓取/渲染橋接、持久化、匯出面板 |
-| `web/js/` | 作業系統本體 — 視窗管理、虛擬檔案系統、67 個應用程式、i18n 層 |
-| `web/js/apps/` | 一個程式一個檔案 |
+| `web/js/` | 作業系統本體 — 視窗管理、虛擬檔案系統、i18n 層、BOB（`autopilot.js`）、時代事件（`events.js`） |
+| `web/js/apps/` | 一個程式一個檔案，共 67 個 |
+| `devserver.py` | 開發迴圈：在 `localhost:8098` 提供 `web/`，方便瀏覽器迭代 |
 | `build.sh` | 編譯並簽署 `Windows 98.app`（ad hoc） |
+| `docs/MODDING.md` | 如何編寫並加入你自己的程式 |
+
+## 做你自己的程式
+
+每個程式都是一個零相依的檔案，新增一個就是一個下午的工程：掛上
+`W98.Apps`、用 `WM.create()` 建視窗、在開始選單加一行、在 canvas 上畫
+32×32 圖示 — 還可以教 BOB 使用它。完整教學（含可直接貼上的完整範例
+程式）在 **[docs/MODDING.md](docs/MODDING.md)**。
 
 ---
 

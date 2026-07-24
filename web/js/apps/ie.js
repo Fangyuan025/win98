@@ -1,4 +1,7 @@
-/* ie.js — Internet Explorer with a built-in retro "internet" */
+/* ie.js — Internet Explorer 4.0: a built-in 19-site 1998 "internet", plus a
+   live bridge to the real one (webfetch.js) that re-renders modern pages in
+   period gray-and-serif. Built-in addresses stay built-in; everything else
+   dials out — assuming the modem is connected. */
 "use strict";
 W98.Apps = W98.Apps || {};
 W98.Apps.ie = {

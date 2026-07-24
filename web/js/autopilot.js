@@ -1,8 +1,12 @@
 /* autopilot.js — Autopilot 98: hand the computer to BOB, a ghost user who
    works the machine like it is 1998. A visible cursor drifts with human
    easing, menus open, sentences get typed (with typos, then regret, then
-   backspace), Minesweeper gets played badly. Any real mouse or key input
-   instantly returns control. */
+   backspace). BOB has 29 expert skills — he wins Minesweeper by real
+   deduction, banks Spider runs, plans FreeCell with two-ply lookahead,
+   clears Stackz lines, hunts Corridor goo by BFS — and a universal
+   explorer for every other program. Real input never interrupts him;
+   only ESC hands the machine back. Test hooks: _solo / _probe /
+   _marathon / _trace. */
 "use strict";
 W98.Autopilot = (() => {
   let active = false;

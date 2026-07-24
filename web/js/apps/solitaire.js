@@ -1,4 +1,5 @@
-/* solitaire.js — Klondike */
+/* solitaire.js — Klondike: draw-one or draw-three, standard scoring, a
+   deck-back picker, and the cascading card waterfall you won for. */
 "use strict";
 W98.Apps = W98.Apps || {};
 W98.Apps.solitaire = {

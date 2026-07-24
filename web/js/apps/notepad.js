@@ -1,4 +1,4 @@
-/* notepad.js */
+/* notepad.js — Notepad: plain text over the VFS, word wrap optional, F5 stamps the time. */
 "use strict";
 W98.Apps = W98.Apps || {};
 W98.Apps.notepad = {
