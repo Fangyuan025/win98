@@ -203,9 +203,8 @@ const Taskbar = W98.Taskbar = (() => {
       buttons: ["Yes", "No"], defaultBtn: 1
     }).then(r => {
       if (r === "Yes") {
-        Store.saveNow();
         try { sessionStorage.setItem("w98logoff", "1"); } catch (e) {}
-        location.reload();
+        Store.reboot();
       }
     });
   }

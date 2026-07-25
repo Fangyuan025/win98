@@ -4,8 +4,14 @@ const Store = W98.Store = {
   data: null,
   load() {
     let raw = null;
-    if (window.__WIN98_STATE__) raw = window.__WIN98_STATE__;
-    else { try { raw = localStorage.getItem("win98-state"); } catch (e) {} }
+    /* a soft reboot stashes live state here — it outranks the boot-time
+       injection, which is a snapshot from when the native app launched */
+    try {
+      raw = sessionStorage.getItem("win98-reload-state");
+      if (raw) sessionStorage.removeItem("win98-reload-state");
+    } catch (e) { raw = null; }
+    if (!raw && window.__WIN98_STATE__) raw = window.__WIN98_STATE__;
+    if (!raw) { try { raw = localStorage.getItem("win98-state"); } catch (e) {} }
     try { this.data = typeof raw === "string" ? JSON.parse(raw) : (raw || null); } catch (e) { this.data = null; }
     if (!this.data || typeof this.data !== "object") this.data = {};
     return this.data;
@@ -27,6 +33,12 @@ const Store = W98.Store = {
       if (window.webkit && webkit.messageHandlers && webkit.messageHandlers.persist)
         webkit.messageHandlers.persist.postMessage(json);
     } catch (e) {}
+  },
+  /* reload that keeps its memory: persist, stash for the next load, go */
+  reboot() {
+    this.saveNow();
+    try { sessionStorage.setItem("win98-reload-state", JSON.stringify(this.data)); } catch (e) {}
+    location.reload();
   },
   native(msg) {
     try {

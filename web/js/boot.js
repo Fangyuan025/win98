@@ -300,14 +300,13 @@ const Boot = W98.Boot = (() => {
       boot.append(el("div", { class: "safe" },
         "It's now safe to turn off", el("br"), "your computer.",
         el("div", { style: "font-size:13px;color:#666;margin-top:40px", text: "(click anywhere to turn the computer back on)" })));
-      boot.addEventListener("mousedown", () => location.reload(), { once: true });
+      boot.addEventListener("mousedown", () => Store.reboot(), { once: true });
     });
   }
 
   function restart() {
     Store.set("cleanShutdown", true);
-    Store.saveNow && Store.saveNow();
-    shutdownScreen("Windows is restarting", () => location.reload());
+    shutdownScreen("Windows is restarting", () => Store.reboot());
   }
 
   function dosMode() {
@@ -337,7 +336,7 @@ const Boot = W98.Boot = (() => {
         if (e.key === "Enter") {
           const cmd = buf.trim().toLowerCase();
           buf = "";
-          if (cmd === "win" || cmd === "exit") { location.reload(); return; }
+          if (cmd === "win" || cmd === "exit") { Store.reboot(); return; }
           dos.textContent += "\nType WIN to return to Windows.\n\nC:\\WINDOWS>";
         } else if (e.key === "Backspace") { buf = buf.slice(0, -1); render(); }
         else if (e.key.length === 1) { buf += e.key; render(); }
