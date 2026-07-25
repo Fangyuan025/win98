@@ -826,12 +826,14 @@ W98.Autopilot = (() => {
       if (games >= 2) return false;
       games++; passes = 0; drawStreak = 0; progressThisPass = true;
       br("F2");
-      await keyTap(w, "F2");
+      await sleep(rnd(700, 1600));               /* sit with the defeat a moment */
+      await newGameVisible(w);
       await sleep(rnd(900, 1500));
       return true;
     };
     for (let round = 0; round < 130; round++) {
       check();
+      await dally();
       const st = S();
       if (!st) break;
       const before = prog(st);
@@ -862,6 +864,8 @@ W98.Autopilot = (() => {
       /* 2. move a run only when it flips a card (or clears ground for a waiting king) */
       let acted = false;
       const byDepth = heads.slice().sort((a, b) => b.i - a.i);
+      if (byDepth.length > 1 && Math.random() < 0.12)
+        [byDepth[0], byDepth[1]] = [byDepth[1], byDepth[0]];   /* humans aren't optimal */
       for (const h of byDepth) {
         if (h.i === 0 && !(kingWaiting && rankOf(h.c) !== 13)) continue;
         const dstCol = st.tab.findIndex((col, ti) =>
@@ -925,8 +929,11 @@ W98.Autopilot = (() => {
       /* 6. draw from the stock; a full pass with no progress means the game is stuck */
       if (!st.stock.length && !st.waste.length) { if (await redeal()) continue; break; }
       if (!st.stock.length) {
-        if (!progressThisPass || passes >= 2) { if (await redeal()) continue; break; }
+        /* only a full pass with NO progress means this deal is done —
+           a productive pass earns another lap through the deck */
+        if (!progressThisPass) { if (await redeal()) continue; break; }
         passes++; progressThisPass = false;
+        if (passes >= 6) break;                  /* safety rail, not a rule */
       }
       const slot = w.el.querySelector(".sol-slot");
       if (!slot) break;
@@ -961,6 +968,7 @@ W98.Autopilot = (() => {
     const seen = new Set();          /* never repeat an exact move between deals */
     for (let mv = 0; mv < 260; mv++) {
       check();
+      await dally();
       const st = sp.state();
       if (st.done >= 1) break;                     /* a full K-to-A run banked */
       const cols = st.colsFull;
@@ -981,7 +989,8 @@ W98.Autopilot = (() => {
             const runLen2 = col.length - idx;
             const scoreM = (flip ? 100 : 0) + (joins ? 20 + runLen2 * 2 : 4) +
               (idx === 0 ? -6 : 0);
-            if (!best || scoreM > best.scoreM) best = { ci, idx, ti, scoreM, key };
+            const jitter = Math.random() < 0.15 ? rnd(-12, 12) : 0;   /* human eyes */
+            if (!best || scoreM + jitter > best.scoreM) best = { ci, idx, ti, scoreM, key };
           }
         }
       }
@@ -1009,7 +1018,9 @@ W98.Autopilot = (() => {
   }
 
   /* ---- WallBall (JezzBall rules): fire dividers away from the balls ---- */
-  /* ---- WallBall: squeeze the atoms — cut just outside the swarm, advance ---- */
+  /* ---- WallBall: squeeze the atoms — cut just outside the swarm, advance.
+     Right-click (a real button-2 mousedown; the game ignores contextmenu)
+     flips the wall orientation before an off-axis cut. ---- */
   async function actWallball() {
     const w = await ghostLaunch("wallball", null, "WallBall");
     if (!w || w.closed) return;
@@ -1017,33 +1028,30 @@ W98.Autopilot = (() => {
     if (!cv) { await maybeClose(w, 1); return; }
     await sleep(rnd(800, 1400));
     const startLevel = w._wb ? w._wb.state().level : 1;
-    let vertical = true, retried = false;
-    const clickAt = async (fx, fy, right) => {
+    let vertical = true, revived = false;
+    const canvasClick = async (fx, fy, button) => {
       const r = cv.getBoundingClientRect();
       const px = r.left + fx * r.width / cv.width;
       const py = r.top + fy * r.height / cv.height;
       const sp = $("#screen").getBoundingClientRect();
       await moveTo(px - sp.left, py - sp.top);
-      if (right) {
-        cv.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: px, clientY: py, button: 2 }));
-      } else {
-        cv.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, clientX: px, clientY: py, button: 0 }));
-        cv.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, clientX: px, clientY: py, button: 0 }));
-        cv.dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: px, clientY: py, button: 0 }));
-      }
+      cv.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, clientX: px, clientY: py, button: button || 0 }));
+      cv.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, clientX: px, clientY: py, button: button || 0 }));
     };
     for (let shot = 0; shot < 40; shot++) {
       check();
+      await dally();
       const st = w._wb && w._wb.state();
       if (!st) break;
       if (st.level > startLevel) break;            /* level cleared — mission done */
       if (st.state === "over") {                   /* the atoms won — one rematch */
-        if (retried) break;
-        retried = true;
-        await dismissStrays();
-        await keyTap(w, "F2");
-        await sleep(rnd(700, 1200));
-        continue;
+        if (revived) break;
+        revived = true;
+        await sleep(rnd(600, 1200));
+        const again = [...w.el.ownerDocument.querySelectorAll(".msgbox-btns .btn")]
+          .find(b => /^(Yes|是)$/.test(b.textContent.trim()));
+        if (again) { await clickEl(again); await sleep(rnd(700, 1200)); continue; }
+        break;
       }
       const next = [...w.el.ownerDocument.querySelectorAll(".msgbox-btns .btn")]
         .find(b => /Next Level/i.test(b.textContent));
@@ -1055,25 +1063,78 @@ W98.Autopilot = (() => {
       const minY2 = Math.min(...ys), maxY2 = Math.max(...ys);
       const leftGap = minX2, rightGap = cv.width - maxX2;
       const topGap = minY2, botGap = cv.height - maxY2;
-      /* cut just outside the swarm on the roomiest side; flip orientation as needed */
-      const bestV = Math.max(leftGap, rightGap), bestH = Math.max(topGap, botGap);
-      let fx, fy, wantVert;
-      if (bestV >= bestH) {
-        wantVert = true;
-        fx = leftGap >= rightGap ? Math.max(12, minX2 - 26) : Math.min(cv.width - 12, maxX2 + 26);
-        fy = cv.height * rnd(0.3, 0.7);
+      /* cut a comfortable step outside the swarm on the roomiest side;
+         if no side is roomy, fall back to the point farthest from every ball */
+      const PAD = 34, MIN_ROOM = 64;
+      /* a wall is only safe if the atoms are NOT heading toward it while it grows */
+      const toward = (dir) => balls.filter(b =>
+        dir === "L" ? b.vx < 0 : dir === "R" ? b.vx > 0 :
+        dir === "T" ? b.vy < 0 : b.vy > 0).length;
+      const sides = [
+        { vert: true,  room: leftGap,  appr: toward("L"), fx: minX2 - PAD, fy: cv.height * rnd(0.3, 0.7) },
+        { vert: true,  room: rightGap, appr: toward("R"), fx: maxX2 + PAD, fy: cv.height * rnd(0.3, 0.7) },
+        { vert: false, room: topGap,   appr: toward("T"), fy: minY2 - PAD, fx: cv.width * rnd(0.3, 0.7) },
+        { vert: false, room: botGap,   appr: toward("B"), fy: maxY2 + PAD, fx: cv.width * rnd(0.3, 0.7) }
+      ].filter(c => c.room >= MIN_ROOM);
+      let cut;
+      if (sides.length) {
+        sides.sort((a, b) => (b.room - b.appr * 45) - (a.room - a.appr * 45));
+        cut = (Math.random() < 0.15 && sides.length > 1) ? sides[1] : sides[0];
       } else {
-        wantVert = false;
-        fy = topGap >= botGap ? Math.max(12, minY2 - 26) : Math.min(cv.height - 12, maxY2 + 26);
-        fx = cv.width * rnd(0.3, 0.7);
+        let bestX = cv.width / 2, bestD = -1;
+        for (let x = cv.width * 0.12; x < cv.width * 0.88; x += cv.width / 16) {
+          const d = Math.min(...balls.map(b => Math.abs(b.x - x)), 9999);
+          if (d > bestD) { bestD = d; bestX = x; }
+        }
+        cut = { vert: true, fx: bestX, fy: cv.height * rnd(0.3, 0.7) };
       }
-      if (wantVert !== vertical) { await clickAt(fx, fy, true); vertical = wantVert; await sleep(rnd(200, 400)); }
-      await clickAt(fx, fy, false);
-      await sleepReal(rnd(1500, 2200));    /* watch the wall grow, pray a little */
+      cut.fx = Math.max(10, Math.min(cv.width - 10, cut.fx));
+      cut.fy = Math.max(10, Math.min(cv.height - 10, cut.fy));
+      /* the game flips orientation on a REAL right button-2 mousedown */
+      if (cut.vert !== vertical) {
+        await canvasClick(cut.fx, cut.fy, 2);
+        vertical = cut.vert;
+        await sleep(rnd(250, 500));
+      }
+      await canvasClick(cut.fx, cut.fy, 0);
+      await sleepReal(rnd(1700, 2400));    /* watch the wall grow, pray a little */
     }
     await sleep(rnd(700, 1300));
     await maybeClose(w);
   }
+
+  /* open a menubar menu and click an item — the visible way to do things */
+  async function menuPick(w, menuRe, itemRe) {
+    const m = [...w.el.querySelectorAll(".menubar > span")].find(x => menuRe.test(x.textContent));
+    if (!m) return false;
+    const p = screenPoint(m);
+    await moveTo(p.x, p.y);
+    m.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    await sleep(rnd(350, 700));
+    const item = [...document.querySelectorAll(".menu-pop .menu-item")].find(r => itemRe.test(r.textContent));
+    if (!item) { document.dispatchEvent(new MouseEvent("mousedown", { bubbles: true })); return false; }
+    await clickEl(item);
+    item.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+    await sleep(rnd(300, 600));
+    return true;
+  }
+  /* start over the way a person does: through the Game menu, not a hotkey */
+  async function newGameVisible(w) {
+    if (await menuPick(w, /Game|遊戲/, /New Game|Deal|新遊戲|發牌/)) return;
+    await keyTap(w, "F2");                        /* fallback for menu-less games */
+  }
+  /* human noise: sometimes drift the mouse somewhere pointless, or just stare */
+  async function dally() {
+    if (turbo) return;
+    const roll = Math.random();
+    if (roll < 0.10) {
+      await moveTo(clamp(cx + rnd(-140, 140), 60, 740), clamp(cy + rnd(-90, 90), 60, 520));
+      await sleepReal(rnd(400, 1300));
+    } else if (roll < 0.17) {
+      await sleepReal(rnd(800, 2100));
+    }
+  }
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
   async function keyTap(w, key, holdMs) {
     w.el.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
@@ -1102,7 +1163,7 @@ W98.Autopilot = (() => {
         lives++; eats = 0;
         await sleep(rnd(700, 1200));
         await dismissStrays();
-        await keyTap(w, "F2");
+        await newGameVisible(w);
         await sleep(rnd(500, 900));
         foodSig = wm.state().food.join(",");
         lastHead = "";
@@ -1147,7 +1208,7 @@ W98.Autopilot = (() => {
     for (let block = 0; block < 32; block++) {
       if (block === 31 && boards < 1 && stk && stk.state().lines < 4 && stk.state().state === "play") {
         boards++; block = -1;                       /* cold board — deal again */
-        await keyTap(w, "F2");
+        await newGameVisible(w);
         await sleep(rnd(700, 1200));
         continue;
       }
@@ -1515,6 +1576,7 @@ W98.Autopilot = (() => {
     let deals = 0;
     for (let mvN = 0; mvN < 150; mvN++) {
       check();
+      await dally();
       const st = fc.state();
       const sig = JSON.stringify([st.free, st.cols]);
       seenSig.add(sig);
@@ -1527,6 +1589,8 @@ W98.Autopilot = (() => {
         cands.push({ mv, st2, sc: score(st2) });
       }
       cands.sort((a, b) => b.sc - a.sc);
+      if (cands.length > 1 && Math.random() < 0.10 && cands[1].sc > cands[0].sc - 40)
+        [cands[0], cands[1]] = [cands[1], cands[0]];           /* a human wobble */
       let best = null;
       for (const cand of cands.slice(0, 6)) {      /* peek one move further */
         let follow = cand.sc;
@@ -1540,7 +1604,8 @@ W98.Autopilot = (() => {
       if (!best || best.sc < base - 60) {          /* out of useful moves */
         if (deals < 2 && foundTotal(st) < 8) {     /* weak board — shrug, redeal */
           deals++; seenSig.clear();
-          await keyTap(w, "F2");
+          await sleep(rnd(600, 1400));
+          await newGameVisible(w);
           await sleep(rnd(900, 1500));
           continue;
         }
