@@ -1091,6 +1091,17 @@
       x.beginPath(); x.arc(bx, by, 3.6, 0, Math.PI * 2); x.fill();
     });
   };
+  draws.thunder = (x) => {
+    x.fillStyle = "#000018"; rr(x, 1, 1, 30, 30, 3); x.fill();
+    x.fillStyle = "#405070";
+    [[5, 5], [24, 8], [9, 24], [20, 18], [14, 3], [27, 26]].forEach(p => x.fillRect(p[0], p[1], 1, 1));
+    x.fillStyle = "#b0c8e8"; x.fillRect(15, 6, 2, 16);          /* fuselage */
+    x.fillStyle = "#5878b8"; x.fillRect(7, 14, 18, 4);          /* wings */
+    x.fillRect(11, 18, 10, 3);
+    x.fillStyle = "#e8a030"; x.fillRect(15, 22, 2, 4);          /* burner */
+    x.fillStyle = "#ffe080"; x.fillRect(15, 2, 2, 3);           /* cannon shot */
+    x.fillStyle = "#ff6040"; x.fillRect(23, 4, 3, 3);           /* incoming */
+  };
   draws.worm = x => {
     x.fillStyle = "#000"; rr(x, 2, 2, 28, 28, 2); x.fill();
     x.strokeStyle = "#a00000"; x.lineWidth = 2; x.strokeRect(3.5, 3.5, 25, 25);

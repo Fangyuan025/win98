@@ -1268,6 +1268,81 @@ W98.Autopilot = (() => {
     await maybeClose(w);
   }
 
+  /* ---- Thunder Wing: hold the trigger, slide under targets, dodge the red ---- */
+  async function actThunder() {
+    const w = await ghostLaunch("thunder", null, "Thunder Wing");
+    if (!w || w.closed) return;
+    await sleep(rnd(700, 1200));
+    const tw = w._thunder;
+    if (!tw) { await maybeClose(w, 1); return; }
+    const kd = (k) => w.el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true }));
+    const ku = (k) => w.el.dispatchEvent(new KeyboardEvent("keyup", { key: k, bubbles: true }));
+    kd(" ");                                       /* the trigger stays held */
+    let held = null, revived = false;
+    const steer = (dir) => {
+      if (dir === held) return;
+      if (held) ku(held);
+      if (dir) kd(dir);
+      held = dir;
+    };
+    for (let i = 0; i < 2400; i++) {
+      check();
+      const st = tw.state();
+      if (st.state === "over") {
+        steer(null); ku(" ");
+        if (revived || st.score >= 2500) break;
+        revived = true;
+        await sleep(rnd(700, 1300));
+        const again = [...w.el.ownerDocument.querySelectorAll(".msgbox-btns .btn")]
+          .find(b => /^(Yes|是)$/.test(b.textContent.trim()));
+        if (again) { await clickEl(again); } else { await newGameVisible(w); }
+        await sleep(rnd(500, 900));
+        kd(" ");
+        continue;
+      }
+      if (st.state !== "play") { await sleepReal(200); continue; }
+      if (st.score >= 3000) break;                 /* a respectable sortie */
+      const px = st.player.x, py = st.player.y;
+      /* danger: where will each fireball / diving foe be when it reaches my row? */
+      const danger = (cx2) => {
+        let dgr = 0;
+        for (const b of st.fireballs) {
+          if (b.vy <= 0.2) continue;
+          const t = (py - b.y) / b.vy;
+          if (t < 0 || t > 34) continue;
+          const bx = b.x + b.vx * t;
+          const dd = Math.abs(bx - cx2);
+          if (dd < 26) dgr += (26 - dd) * (34 - t);
+        }
+        for (const f of st.foes) {
+          if (f.y > py - 34 && Math.abs(f.x - cx2) < f.r + 14) dgr += 220;
+        }
+        return dgr;
+      };
+      /* target: nearest power chip when safe, else the nearest foe's column */
+      let targetX = px;
+      const chip = st.drops.find(d => d.y > py - 170 && d.y < py + 20);
+      if (chip) targetX = chip.x;
+      else if (st.foes.length) {
+        const f = st.foes.reduce((a, b) => (Math.abs(a.x - px) < Math.abs(b.x - px) ? a : b));
+        targetX = f.x;
+      }
+      /* pick the least-dangerous nearby column, tie-broken toward the target */
+      let bestX = px, bestCost = Infinity;
+      for (const cand of [px - 56, px - 28, px, px + 28, px + 56]) {
+        if (cand < 14 || cand > 346) continue;
+        const cost = danger(cand) * 3 + Math.abs(cand - targetX);
+        if (cost < bestCost) { bestCost = cost; bestX = cand; }
+      }
+      if (danger(px) > 400 && st.bombs > 0) { kd("b"); ku("b"); }   /* the panic button */
+      steer(bestX < px - 6 ? "ArrowLeft" : bestX > px + 6 ? "ArrowRight" : null);
+      await sleepReal(34);
+    }
+    steer(null); ku(" ");
+    await sleep(rnd(800, 1400));
+    await maybeClose(w);
+  }
+
   /* ---- Corridor: BFS through the maze to the goo, then zap it ---- */
   async function actCorridor() {
     const w = await ghostLaunch("corridor", null, "CORRIDOR");
@@ -1770,6 +1845,7 @@ W98.Autopilot = (() => {
     { id: "worm", w: 1, run: actWorm },
     { id: "stackz", w: 2, run: actStackz },
     { id: "corridor", w: 1, run: actCorridor },
+    { id: "thunder", w: 2, run: actThunder },
     { id: "tv", w: 2, run: actTV },
     { id: "composer", w: 1, run: actComposer },
     { id: "photogoo", w: 1, run: actPhotogoo },

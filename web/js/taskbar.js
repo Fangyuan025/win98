@@ -35,6 +35,7 @@ const Taskbar = W98.Taskbar = (() => {
           { label: "Spider Solitaire", icon: "spider", click: () => W98.launch("spider") },
           { label: "Stackz", icon: "stackz", click: () => W98.launch("stackz") },
           { label: "Star Pilot Pinball", icon: "pinball", click: () => W98.launch("pinball") },
+          { label: "Thunder Wing 98", icon: "thunder", click: () => W98.launch("thunder") },
           { label: "WallBall", icon: "wallball", click: () => W98.launch("wallball") },
           { label: "Worm 98", icon: "worm", click: () => W98.launch("worm") }
         ]},
