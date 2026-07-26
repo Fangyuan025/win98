@@ -1268,7 +1268,7 @@ W98.Autopilot = (() => {
     await maybeClose(w);
   }
 
-  /* ---- Thunder Wing: hold the trigger, slide under targets, dodge the red ---- */
+  /* ---- Thunder Wing: hold the trigger, work the whole plane, respect mines ---- */
   async function actThunder() {
     const w = await ghostLaunch("thunder", null, "Thunder Wing");
     if (!w || w.closed) return;
@@ -1277,21 +1277,21 @@ W98.Autopilot = (() => {
     if (!tw) { await maybeClose(w, 1); return; }
     const kd = (k) => w.el.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true }));
     const ku = (k) => w.el.dispatchEvent(new KeyboardEvent("keyup", { key: k, bubbles: true }));
-    kd(" ");                                       /* the trigger stays held */
-    let held = null, revived = false;
-    const steer = (dir) => {
-      if (dir === held) return;
-      if (held) ku(held);
-      if (dir) kd(dir);
-      held = dir;
+    kd(" ");                                       /* starts the run from the title card, then never lets go */
+    let heldX = null, heldY = null, revives = 0, bossSide = 1, sideAt = 0;
+    const steer = (dx, dy) => {
+      if (dx !== heldX) { if (heldX) ku(heldX); if (dx) kd(dx); heldX = dx; }
+      if (dy !== heldY) { if (heldY) ku(heldY); if (dy) kd(dy); heldY = dy; }
     };
-    for (let i = 0; i < 2400; i++) {
+    for (let i = 0; i < 4200; i++) {
       check();
       const st = tw.state();
+      if (st.state === "title") { kd(" "); await sleepReal(120); continue; }
+      if (st.state === "clear") { await sleepReal(200); continue; }
       if (st.state === "over") {
-        steer(null); ku(" ");
-        if (revived || st.score >= 2500) break;
-        revived = true;
+        steer(null, null); ku(" ");
+        if (revives >= 2 || st.score >= 9000) break;
+        revives++;
         await sleep(rnd(700, 1300));
         const again = [...w.el.ownerDocument.querySelectorAll(".msgbox-btns .btn")]
           .find(b => /^(Yes|是)$/.test(b.textContent.trim()));
@@ -1301,44 +1301,64 @@ W98.Autopilot = (() => {
         continue;
       }
       if (st.state !== "play") { await sleepReal(200); continue; }
-      if (st.score >= 3000) break;                 /* a respectable sortie */
+      if (st.score >= 12000) break;                /* a heroic sortie, go home */
       const px = st.player.x, py = st.player.y;
-      /* danger: where will each fireball / diving foe be when it reaches my row? */
-      const danger = (cx2) => {
+      const boss = st.foes.find(f => f.kind === "boss");
+      /* danger at a candidate position: projected bullets, bodies, mine radii */
+      const danger = (cx2, cy2) => {
         let dgr = 0;
         for (const b of st.fireballs) {
-          if (b.vy <= 0.2) continue;
-          const t = (py - b.y) / b.vy;
-          if (t < 0 || t > 34) continue;
-          const bx = b.x + b.vx * t;
-          const dd = Math.abs(bx - cx2);
-          if (dd < 26) dgr += (26 - dd) * (34 - t);
+          const spd = Math.hypot(b.vx, b.vy) || 1;
+          /* time for the bullet to reach the candidate's vicinity */
+          const t = ((cy2 - b.y) * b.vy + (cx2 - b.x) * b.vx) / (spd * spd);
+          if (t < 0 || t > 40) continue;
+          const bx = b.x + b.vx * t, by2 = b.y + b.vy * t;
+          const dd = Math.hypot(bx - cx2, by2 - cy2);
+          if (dd < 30) dgr += (30 - dd) * (40 - t) * 0.9;
         }
         for (const f of st.foes) {
-          if (f.y > py - 34 && Math.abs(f.x - cx2) < f.r + 14) dgr += 220;
+          if (f.kind === "mine") {
+            const dd = Math.hypot(f.x - cx2, f.y - cy2);
+            if (dd < 96) dgr += (96 - dd) * 6;    /* proximity fuses are rude */
+          } else if (f.kind === "boss") {
+            if (Math.abs(f.x - cx2) < 20 && cy2 > f.y) dgr += 140;  /* the aimed-stream axis */
+          } else if (f.y > cy2 - 46 && f.y < cy2 + 20 && Math.abs(f.x - cx2) < f.r + 16) {
+            dgr += 260;                            /* a body where I want to be */
+          }
         }
         return dgr;
       };
-      /* target: nearest power chip when safe, else the nearest foe's column */
+      /* target column: a needed chip first, then boss flank, then nearest foe */
       let targetX = px;
-      const chip = st.drops.find(d => d.y > py - 170 && d.y < py + 20);
+      const chip = st.drops.find(d => (d.t !== "P" || st.power < 3) && d.y > py - 190 && d.y < py + 24);
       if (chip) targetX = chip.x;
-      else if (st.foes.length) {
+      else if (boss) {
+        /* strafe faster once the boss starts aiming — never be where it looked */
+        const period = boss.phase >= 3 ? 40 : boss.phase === 2 ? 64 : 90;
+        if (i - sideAt > period) { bossSide *= -1; sideAt = i; }
+        /* stay INSIDE the hit window (boss r+3) while off the stream axis */
+        targetX = boss.x + (boss.phase >= 3 ? 26 : 22) * bossSide;
+      } else if (st.foes.length) {
         const f = st.foes.reduce((a, b) => (Math.abs(a.x - px) < Math.abs(b.x - px) ? a : b));
         targetX = f.x;
       }
-      /* pick the least-dangerous nearby column, tie-broken toward the target */
-      let bestX = px, bestCost = Infinity;
-      for (const cand of [px - 56, px - 28, px, px + 28, px + 56]) {
-        if (cand < 14 || cand > 346) continue;
-        const cost = danger(cand) * 3 + Math.abs(cand - targetX);
-        if (cost < bestCost) { bestCost = cost; bestX = cand; }
+      /* choose among a 2D grid of nearby positions */
+      let bestX = px, bestY = py, bestCost = Infinity;
+      for (const cdx of [-70, -45, -22, 0, 22, 45, 70]) {
+        for (const cdy of [0, -30, 26]) {
+          const cx2 = px + cdx, cy2 = py + cdy;
+          if (cx2 < 14 || cx2 > 346 || cy2 < 220 || cy2 > 426) continue;
+          const cost = danger(cx2, cy2) * 3 + Math.abs(cx2 - targetX) +
+            Math.abs(cy2 - 394) * 0.5;             /* home row bias */
+          if (cost < bestCost) { bestCost = cost; bestX = cx2; bestY = cy2; }
+        }
       }
-      if (danger(px) > 400 && st.bombs > 0) { kd("b"); ku("b"); }   /* the panic button */
-      steer(bestX < px - 6 ? "ArrowLeft" : bestX > px + 6 ? "ArrowRight" : null);
-      await sleepReal(34);
+      if (danger(px, py) > 300 && st.bombs > 0) { kd("b"); ku("b"); }  /* the panic button */
+      steer(bestX < px - 6 ? "ArrowLeft" : bestX > px + 6 ? "ArrowRight" : null,
+            bestY < py - 6 ? "ArrowUp" : bestY > py + 6 ? "ArrowDown" : null);
+      await sleepReal(26);
     }
-    steer(null); ku(" ");
+    steer(null, null); ku(" ");
     await sleep(rnd(800, 1400));
     await maybeClose(w);
   }
