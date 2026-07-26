@@ -16,12 +16,14 @@ W98.Apps.thunder = {
     const win = WM.create({
       title: "Thunder Wing 98", icon: "thunder", appId: "thunder",
       width: W + 16, height: H + 74, resizable: false, maximizable: false,
-      onClose: () => clearInterval(timer),
+      onClose: () => { clearInterval(timer); clearInterval(mTimer); },
       statusbar: [{ text: "Score: 0" }, { text: "Lives: 3", width: 70 }, { text: "High: 0", width: 100 }],
       menus: [
         { label: "Game", items: () => [
           { label: "New Game", accel: "F2", click: newGame },
           { label: "Pause", accel: "P", click: togglePause },
+          { label: Store.get("thunderMusic", true) ? "Music: On" : "Music: Off",
+            click: () => { musicOn = !Store.get("thunderMusic", true); Store.set("thunderMusic", musicOn); } },
           "-",
           { label: "Exit", click: () => win.close() }
         ]},
@@ -38,6 +40,87 @@ W98.Apps.thunder = {
     const cv = el("canvas", { width: W, height: H, style: "display:block;background:#000" });
     win.body.append(cv);
     const x = cv.getContext("2d");
+
+    /* ---------- original synth: pew-pew, booms, and a chiptune march ---------- */
+    const AU = () => Sound.audio && Sound.audio();
+    function sfx(kind) {
+      const bus = AU(); if (!bus) return;
+      const ac = bus.ctx, t = ac.currentTime;
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.connect(g); g.connect(bus.master);
+      if (kind === "pew") {
+        o.type = "square";
+        o.frequency.setValueAtTime(880, t);
+        o.frequency.exponentialRampToValueAtTime(220, t + 0.08);
+        g.gain.setValueAtTime(0.016, t);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+        o.start(t); o.stop(t + 0.1);
+      } else if (kind === "pow") {
+        o.type = "triangle";
+        [523, 659, 784, 1047].forEach((f, i) => o.frequency.setValueAtTime(f, t + i * 0.05));
+        g.gain.setValueAtTime(0.05, t);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.24);
+        o.start(t); o.stop(t + 0.26);
+      } else {                                     /* "hit": the bad sound */
+        o.type = "sawtooth";
+        o.frequency.setValueAtTime(160, t);
+        o.frequency.exponentialRampToValueAtTime(40, t + 0.4);
+        g.gain.setValueAtTime(0.09, t);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.42);
+        o.start(t); o.stop(t + 0.45);
+      }
+    }
+    function boomSfx(big) {
+      const bus = AU(); if (!bus) return;
+      const ac = bus.ctx, t = ac.currentTime, dur = big ? 0.7 : 0.22;
+      const buf = ac.createBuffer(1, (ac.sampleRate * dur) | 0, ac.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+      const src = ac.createBufferSource(); src.buffer = buf;
+      const f = ac.createBiquadFilter(); f.type = "lowpass";
+      f.frequency.setValueAtTime(big ? 900 : 1600, t);
+      f.frequency.exponentialRampToValueAtTime(80, t + dur);
+      const g = ac.createGain(); g.gain.value = big ? 0.16 : 0.07;
+      src.connect(f); f.connect(g); g.connect(bus.master);
+      src.start(t);
+      if (big) {                                   /* the floor shakes a little */
+        const o = ac.createOscillator(), g2 = ac.createGain();
+        o.type = "sine";
+        o.frequency.setValueAtTime(70, t);
+        o.frequency.exponentialRampToValueAtTime(28, t + dur);
+        g2.gain.setValueAtTime(0.12, t);
+        g2.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        o.connect(g2); g2.connect(bus.master);
+        o.start(t); o.stop(t + dur + 0.05);
+      }
+    }
+    /* the march: A-minor bass square under a small triangle lead, forever */
+    let musicOn = Store.get("thunderMusic", true);
+    let mStep = 0, mNext = 0;
+    const BASS = [110, 110, 82.4, 82.4, 87.3, 87.3, 98, 98,
+                  110, 110, 82.4, 82.4, 87.3, 87.3, 131, 98];
+    const LEAD = [440, 0, 523, 440, 349, 0, 440, 349,
+                  330, 0, 392, 330, 494, 440, 392, 330];
+    function note(ac, master, f, at, dur, type, vol) {
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.type = type; o.frequency.value = f;
+      g.gain.setValueAtTime(vol, at);
+      g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+      o.connect(g); g.connect(master);
+      o.start(at); o.stop(at + dur + 0.02);
+    }
+    function musicTick() {
+      const bus = AU(); if (!bus || !musicOn || state !== "play") { mNext = 0; return; }
+      const ac = bus.ctx, SPB = 0.14;
+      if (!mNext || mNext < ac.currentTime) mNext = ac.currentTime + 0.05;
+      while (mNext < ac.currentTime + 0.35) {
+        note(ac, bus.master, BASS[mStep & 15], mNext, SPB * 0.9, "square", 0.02);
+        const l = LEAD[mStep & 15];
+        if (l) note(ac, bus.master, l * (level > 2 ? 2 : 1), mNext, SPB * 0.75, "triangle", 0.018);
+        mStep++; mNext += SPB;
+      }
+    }
+    const mTimer = setInterval(musicTick, 110);
 
     function newGame() {
       player = { x: W / 2, y: H - 46 };
@@ -84,7 +167,7 @@ W98.Apps.thunder = {
     }
     function boom(fx, fy, pts) {
       score += pts;
-      Sound.play("click");
+      boomSfx(false);
       dropMaybe(fx, fy);
       sync();
     }
@@ -92,7 +175,7 @@ W98.Apps.thunder = {
       if (invulnT > 0) return;
       lives--;
       invulnT = 100;
-      Sound.play("error");
+      sfx("hit");
       sync();
       if (lives <= 0) {
         state = "over";
@@ -115,7 +198,7 @@ W98.Apps.thunder = {
       fireballs = [];
       for (const f of foes) { f.hp -= 6; if (f.hp <= 0 && f.kind !== "boss") boom(f.x, f.y, 50); }
       foes = foes.filter(f => f.hp > 0);
-      Sound.play("tada");
+      boomSfx(true);
       sync();
     }
 
@@ -132,7 +215,7 @@ W98.Apps.thunder = {
       if (keys.ArrowUp) player.y = Math.max(40, player.y - sp);
       if (keys.ArrowDown) player.y = Math.min(H - 14, player.y + sp);
       if (keys[" "] && frame % 7 === 0) {
-        Sound.play("click");
+        sfx("pew");
         shots.push({ x: player.x, y: player.y - 12, vx: 0 });
         if (power >= 2) shots.push({ x: player.x - 9, y: player.y - 6, vx: 0 });
         if (power >= 2) shots.push({ x: player.x + 9, y: player.y - 6, vx: 0 });
@@ -181,7 +264,7 @@ W98.Apps.thunder = {
             if (f.kind === "boss") {
               boom(f.x, f.y, 5000);
               level++; bossOut = false;
-              Sound.play("tada");
+              boomSfx(true);
             } else boom(f.x, f.y, f.kind === "drone" ? 100 : f.kind === "swayer" ? 250 : 400);
           }
         }
@@ -203,7 +286,7 @@ W98.Apps.thunder = {
           if (d.t === "P") power = Math.min(3, power + 1);
           else if (d.t === "B") bombs++;
           else lives++;
-          Sound.play("ding");
+          sfx("pow");
           sync();
         }
       }
