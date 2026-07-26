@@ -11,19 +11,18 @@ W98.Apps.thunder = {
     const W = 360, H = 440;
     let player, shots, foes, fireballs, drops, stars, score, lives, level,
       power, bombs, wave, frame, state, invulnT, bossOut, timer;
+    let sparks, rings, flashT, shakeT;
     const keys = {};
 
     const win = WM.create({
       title: "Thunder Wing 98", icon: "thunder", appId: "thunder",
       width: W + 16, height: H + 74, resizable: false, maximizable: false,
-      onClose: () => { clearInterval(timer); clearInterval(mTimer); },
+      onClose: () => clearInterval(timer),
       statusbar: [{ text: "Score: 0" }, { text: "Lives: 3", width: 70 }, { text: "High: 0", width: 100 }],
       menus: [
         { label: "Game", items: () => [
           { label: "New Game", accel: "F2", click: newGame },
           { label: "Pause", accel: "P", click: togglePause },
-          { label: Store.get("thunderMusic", true) ? "Music: On" : "Music: Off",
-            click: () => { musicOn = !Store.get("thunderMusic", true); Store.set("thunderMusic", musicOn); } },
           "-",
           { label: "Exit", click: () => win.close() }
         ]},
@@ -41,7 +40,7 @@ W98.Apps.thunder = {
     win.body.append(cv);
     const x = cv.getContext("2d");
 
-    /* ---------- original synth: pew-pew, booms, and a chiptune march ---------- */
+    /* ---------- original synth: pew-pew and booms, nothing borrowed ---------- */
     const AU = () => Sound.audio && Sound.audio();
     function sfx(kind) {
       const bus = AU(); if (!bus) return;
@@ -94,37 +93,11 @@ W98.Apps.thunder = {
         o.start(t); o.stop(t + dur + 0.05);
       }
     }
-    /* the march: A-minor bass square under a small triangle lead, forever */
-    let musicOn = Store.get("thunderMusic", true);
-    let mStep = 0, mNext = 0;
-    const BASS = [110, 110, 82.4, 82.4, 87.3, 87.3, 98, 98,
-                  110, 110, 82.4, 82.4, 87.3, 87.3, 131, 98];
-    const LEAD = [440, 0, 523, 440, 349, 0, 440, 349,
-                  330, 0, 392, 330, 494, 440, 392, 330];
-    function note(ac, master, f, at, dur, type, vol) {
-      const o = ac.createOscillator(), g = ac.createGain();
-      o.type = type; o.frequency.value = f;
-      g.gain.setValueAtTime(vol, at);
-      g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
-      o.connect(g); g.connect(master);
-      o.start(at); o.stop(at + dur + 0.02);
-    }
-    function musicTick() {
-      const bus = AU(); if (!bus || !musicOn || state !== "play") { mNext = 0; return; }
-      const ac = bus.ctx, SPB = 0.14;
-      if (!mNext || mNext < ac.currentTime) mNext = ac.currentTime + 0.05;
-      while (mNext < ac.currentTime + 0.35) {
-        note(ac, bus.master, BASS[mStep & 15], mNext, SPB * 0.9, "square", 0.02);
-        const l = LEAD[mStep & 15];
-        if (l) note(ac, bus.master, l * (level > 2 ? 2 : 1), mNext, SPB * 0.75, "triangle", 0.018);
-        mStep++; mNext += SPB;
-      }
-    }
-    const mTimer = setInterval(musicTick, 110);
 
     function newGame() {
       player = { x: W / 2, y: H - 46 };
       shots = []; foes = []; fireballs = []; drops = [];
+      sparks = []; rings = []; flashT = 0; shakeT = 0;
       score = 0; lives = 3; level = 1; power = 1; bombs = 1;
       wave = 0; frame = 0; invulnT = 0; bossOut = false;
       state = "play";
@@ -165,8 +138,16 @@ W98.Apps.thunder = {
       else if (roll < 0.13) drops.push({ t: "B", x: fx, y: fy, vy: 1.4 });
       else if (roll < 0.15) drops.push({ t: "L", x: fx, y: fy, vy: 1.4 });
     }
+    function burst(fx, fy, n, col) {
+      for (let i = 0; i < n; i++) {
+        const a = Math.random() * Math.PI * 2, v = 1 + Math.random() * 3;
+        sparks.push({ x: fx, y: fy, vx: Math.cos(a) * v, vy: Math.sin(a) * v,
+          life: 14 + (Math.random() * 12) | 0, col });
+      }
+    }
     function boom(fx, fy, pts) {
       score += pts;
+      burst(fx, fy, 8, "#ffb040");
       boomSfx(false);
       dropMaybe(fx, fy);
       sync();
@@ -195,9 +176,17 @@ W98.Apps.thunder = {
     function useBomb() {
       if (state !== "play" || bombs <= 0) return;
       bombs--;
+      for (const b of fireballs) burst(b.x, b.y, 3, "#ff6040");
       fireballs = [];
-      for (const f of foes) { f.hp -= 6; if (f.hp <= 0 && f.kind !== "boss") boom(f.x, f.y, 50); }
+      for (const f of foes) {
+        f.hp -= 6;
+        if (f.hp <= 0 && f.kind !== "boss") { boom(f.x, f.y, 50); burst(f.x, f.y, 10, "#ffe080"); }
+        else burst(f.x, f.y, 5, "#ff6040");
+      }
       foes = foes.filter(f => f.hp > 0);
+      rings.push({ x: player.x, y: player.y, r: 6, v: 9, life: 34 },
+                 { x: player.x, y: player.y, r: 2, v: 6.5, life: 34 });
+      flashT = 5; shakeT = 14;
       boomSfx(true);
       sync();
     }
@@ -291,6 +280,13 @@ W98.Apps.thunder = {
         }
       }
       drops = drops.filter(d => !d.got);
+      /* effects live their short lives */
+      for (const p of sparks) { p.x += p.vx; p.y += p.vy; p.vy += 0.08; p.life--; }
+      sparks = sparks.filter(p => p.life > 0);
+      for (const r of rings) { r.r += r.v; r.v *= 0.94; r.life--; }
+      rings = rings.filter(r => r.life > 0);
+      if (flashT > 0) flashT--;
+      if (shakeT > 0) shakeT--;
       draw();
     }
 
@@ -305,7 +301,9 @@ W98.Apps.thunder = {
       x.fillRect(px - 2, py + 7, 4, 3 + ((frame >> 1) & 3));
     }
     function draw() {
-      x.fillStyle = "#000010"; x.fillRect(0, 0, W, H);
+      x.save();
+      if (shakeT > 0) x.translate((Math.random() - 0.5) * shakeT, (Math.random() - 0.5) * shakeT);
+      x.fillStyle = "#000010"; x.fillRect(-8, -8, W + 16, H + 16);
       x.fillStyle = "#405070";
       for (const st of stars) x.fillRect(st.x, st.y, st.s > 1.8 ? 2 : 1, st.s > 1.8 ? 2 : 1);
       for (const s2 of shots) { x.fillStyle = "#ffe080"; x.fillRect(s2.x - 1, s2.y - 5, 2, 7); }
@@ -334,7 +332,23 @@ W98.Apps.thunder = {
         x.fillStyle = "#000"; x.font = "bold 10px monospace"; x.textAlign = "center";
         x.fillText(d.t, d.x, d.y + 4);
       }
+      for (const p of sparks) {
+        x.globalAlpha = Math.min(1, p.life / 10);
+        x.fillStyle = p.col; x.fillRect(p.x - 1, p.y - 1, 3, 3);
+      }
+      x.globalAlpha = 1;
+      for (const r of rings) {
+        x.globalAlpha = r.life / 34;
+        x.strokeStyle = "#a0d0ff"; x.lineWidth = 3;
+        x.beginPath(); x.arc(r.x, r.y, r.r, 0, 7); x.stroke();
+      }
+      x.globalAlpha = 1;
       if (!(invulnT > 0 && (frame & 4))) craft(player.x, player.y, invulnT > 0);
+      if (flashT > 0) {
+        x.globalAlpha = flashT / 8;
+        x.fillStyle = "#fff"; x.fillRect(-8, -8, W + 16, H + 16);
+        x.globalAlpha = 1;
+      }
       if (state === "pause") {
         x.fillStyle = "rgba(0,0,0,.5)"; x.fillRect(0, 0, W, H);
         x.fillStyle = "#fff"; x.font = "bold 16px monospace"; x.textAlign = "center";
@@ -347,6 +361,7 @@ W98.Apps.thunder = {
         x.fillStyle = "#c0c0c0"; x.font = "11px monospace";
         x.fillText("F2 to fly again", W / 2, H / 2 + 14);
       }
+      x.restore();
     }
 
     win.el.addEventListener("keydown", (e) => {
